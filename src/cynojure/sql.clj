@@ -23,14 +23,25 @@
 (definfix and)
 (definfix or)
 (definfix =)
+(definfix >)
 (definfix >=)
 (definfix <)
+(definfix <=)
 
 (defn- sql-list [& exprs]
   (str-join "," exprs))
 
+(defn- sql-list* [exprs]
+  (apply sql-list (mklist exprs)))
+
 (defn- sql-concat [& exprs]
   (str-join " " exprs))
+
+(defn- sql-pairs [& exprs]
+  (str-join "," (map (fn [x] (apply sql-concat x)) exprs)))
+
+(defn- sql-pairs* [exprs]
+  (apply sql-pairs (mklist exprs)))
 
 (defn sql-in [var match-list]
   (sql-concat var 'in (sql-list match-list)))
@@ -39,15 +50,14 @@
 
 (defun sql-select-stmt [what :key from where order-by group-by limit offset]
   "Return a SQL SELECT query string, for the specified args."
-  (apply sql-concat
-	 "select"
-	 (apply sql-list (mklist what))
-	 "from" (apply sql-list (mklist from))
-	 `(~@(and where `("where" ~where))
-	   ~@(and order-by `("order by" ~(apply sql-list (mklist order-by))))
-	   ~@(and group-by `("group by" ~(apply sql-list (mklist group-by))))
-	   ~@(and limit `("limit" ~limit))
-	   ~@(and offset `("offset" ~offset)))))
+  (with-out-str
+    (print "select" (sql-list* what)
+	   "from" (sql-list* from))
+    (when where (print " where" where))
+    (when order-by (print " order by" (sql-pairs* order-by)))
+    (when group-by (print " group by" (sql-list* group-by)))
+    (when limit (print " limit" limit))
+    (when offset (print " offset" offset))))
 
 (defun sql-count [:key from where]
   "Perform SELECT COUNT(1) using the specified FROM and WHERE
@@ -58,10 +68,10 @@
 
 (defun sql-update-stmt [table value-map :key where]
   "Return a SQL UPDATE command string using the specified args."
-  (apply sql-concat
-	 `("update" ~table
-	   "set" ~(apply sql-list (map (fn [x] (str (tostr x) "=?")) (keys value-map)))
-	   "where" ~where)))
+  (with-out-str
+    (print "update" table
+	   "set" (str-join "," (map (fn [x] (str (tostr x) "=?")) (keys value-map)))
+	   "where" where)))
 
 (defun sql-update [table value-map :key where]
   "Perform a SQL UPDATE command using the specified args."
