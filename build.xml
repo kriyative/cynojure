@@ -1,0 +1,57 @@
+<project name="cynojure" default="jar">
+
+  <description>
+    Pack all cynojure sources into a JAR. Compile those that can be
+    compiled standalone if the clojure.jar property points us to
+    clojure.jar .
+  </description>
+
+  <property name="src" location="src"/>
+  <property name="build" location="classes"/>
+  <property name="clojure.jar" location="/opt/java/lib/clojure.jar"/>
+  <property name="clojure-contrib.jar" location="/opt/java/lib/clojure-contrib.jar"/>
+
+  <available property="hasclojure" file="${clojure.jar}"/>
+
+  <!-- The JAR file to create. -->
+  <property name="jarfile" location="cynojure.jar"/>
+
+  <target name="init">
+    <tstamp/>
+    <mkdir dir="${build}"/>
+  </target>
+
+  <target name="clean" description="Remove generated files and directories.">
+    <delete file="${jarfile}"/>
+    <delete dir="${build}"/>
+  </target>
+
+  <target name="compile_cynojure" depends="init"
+          description="Compile cynojure sources."
+          if="hasclojure">
+    <java classname="clojure.lang.Compile">
+      <classpath>
+        <path location="${build}"/>
+        <path location="${src}"/>
+        <path location="${clojure.jar}"/>
+	<path location="${clojure-contrib.jar}"/>
+      </classpath>
+      <sysproperty key="clojure.compile.path" value="${build}"/>
+      <arg value="cynojure.util"/>
+      <arg value="cynojure.cl"/>
+      <arg value="cynojure.sql"/>
+    </java>
+  </target>
+
+  <target name="jar" description="Create jar file." depends="compile_cynojure">
+    <jar jarfile="${jarfile}">
+      <path location="CPL.TXT"/>
+      <fileset dir="${src}" includes="**/*.clj"/>
+      <fileset dir="${build}" includes="**/*.class"/>
+      <manifest>
+        <attribute name="Class-Path" value="."/>
+      </manifest>
+    </jar>
+  </target>
+
+</project>
