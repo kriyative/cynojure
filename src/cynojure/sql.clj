@@ -54,7 +54,7 @@
     (string? expr) (printf "'%s'" expr)
     (seq? expr) (do
 		  (print "(")
-		  (foreach emit (interpose \space seq))
+		  (foreach emit (interpose \space expr))
 		  (print ")"))
     :else (print expr)))
 
