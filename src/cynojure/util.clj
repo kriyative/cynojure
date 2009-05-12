@@ -79,3 +79,11 @@ arg. e.g,
   (seq (.getURLs (java.lang.ClassLoader/getSystemClassLoader))))
 
 ;; (get-system-classpaths)
+
+(defun foreach [f seq]
+  (loop [s seq]
+    (when (not (empty? s))
+      (f (first s))
+      (recur (rest s)))))
+
+;; (foreach print '(a b c))
