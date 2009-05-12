@@ -81,6 +81,11 @@ arg. e.g,
 ;; (get-system-classpaths)
 
 (defun foreach [f seq]
+  "A basic foreach, when you absolutely need to side effect on a
+  sequence.
+
+  (foreach print '(a b c 1 2 3)) => nil
+  abc123"
   (loop [s seq]
     (when (not (empty? s))
       (f (first s))
