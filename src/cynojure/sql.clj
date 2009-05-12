@@ -22,6 +22,7 @@
 
 (definfix and)
 (definfix or)
+(definfix like)
 (definfix =)
 (definfix >)
 (definfix >=)
@@ -48,34 +49,60 @@
 
 ;; (sql-in 'foo '(1 2 3))
 
-(defun sql-select-stmt [what :key from where order-by group-by limit offset]
-  "Return a SQL SELECT query string, for the specified args."
+(defun sql [sexpr]
+  "Return the specified s-expression in its equivalent SQL form.
+
+  (sql (sql-and (sql->= 'age 20) (sql-like 'name \"%smith%\"))) =>
+  \"((age >= 20) and (name like '%smith%'))\""
+  (let [emit-seq (fn [seq]
+		   (print "(")
+		   (foreach emit1 (interpose \space seq))
+		   (print ")"))
+	emit1 (fn [expr]
+		(cond
+		  (string? expr) (printf "'%s'" expr)
+		  (seq? expr) (emit-seq expr)
+		  :else (print expr)))]
+    (with-out-str (emit1 sexpr))))
+
+(defun query-str [what :key from where order-by group-by limit offset]
+  "Return a SQL SELECT query string, for the specified args.
+
+  (query-str \"count(1)\"
+	     :from 'person
+	     :where (sql-and (sql->= 'age 20)
+			     (sql-<= 'age 40))
+	     :order-by '((name asc) (id desc)))"
   (with-out-str
     (print "select" (sql-list* what)
 	   "from" (sql-list* from))
-    (when where (print " where" where))
+    (when where (print " where" (if (string? where) where (sql where))))
     (when order-by (print " order by" (sql-pairs* order-by)))
     (when group-by (print " group by" (sql-list* group-by)))
     (when limit (print " limit" limit))
     (when offset (print " offset" offset))))
 
-(defun sql-count [:key from where]
+(defun count-rows [:key from where]
   "Perform SELECT COUNT(1) using the specified FROM and WHERE
   clauses."
   (with-query-results rs
-      (sql-select-stmt "count(1)" :from from :where where)
+      (query-str "count(1)" :from from :where where)
     (:count (first rs))))
 
-(defun sql-update-stmt [table value-map :key where]
-  "Return a SQL UPDATE command string using the specified args."
+(defun update-str [table value-map :key where]
+  "Return a SQL UPDATE command string using the specified args.
+
+  (update-str 'person
+	      {:name \"Alice\", :age 30},
+	      :where (sql-= 'id 123))"
   (with-out-str
     (print "update" table
 	   "set" (str-join "," (map (fn [x] (str (tostr x) "=?")) (keys value-map)))
-	   "where" where)))
+	   "where" (if (string? where) where (sql where)))))
 
-(defun sql-update [table value-map :key where]
+(defun update [table value-map :key where]
   "Perform a SQL UPDATE command using the specified args."
-  (apply do-prepared (sql-update-stmt table value-map :where where) [(vals value-map)]))
+  (apply do-prepared (update-str table value-map :where where) [(vals value-map)]))
 
 (defun create-sequence [seq-name]
   "Create a sequence called seq-name."
