@@ -49,21 +49,21 @@
 
 ;; (sql-in 'foo '(1 2 3))
 
+(defn emit [expr]
+  (cond
+    (string? expr) (printf "'%s'" expr)
+    (seq? expr) (do
+		  (print "(")
+		  (foreach emit (interpose \space seq))
+		  (print ")"))
+    :else (print expr)))
+
 (defun sql [sexpr]
   "Return the specified s-expression in its equivalent SQL form.
 
   (sql (sql-and (sql->= 'age 20) (sql-like 'name \"%smith%\"))) =>
   \"((age >= 20) and (name like '%smith%'))\""
-  (let [emit-seq (fn [seq]
-		   (print "(")
-		   (foreach emit1 (interpose \space seq))
-		   (print ")"))
-	emit1 (fn [expr]
-		(cond
-		  (string? expr) (printf "'%s'" expr)
-		  (seq? expr) (emit-seq expr)
-		  :else (print expr)))]
-    (with-out-str (emit1 sexpr))))
+  (with-out-str (emit sexpr)))
 
 (defun query-str [what :key from where order-by group-by limit offset]
   "Return a SQL SELECT query string, for the specified args.
