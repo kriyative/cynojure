@@ -11,9 +11,10 @@
 ;; remove this notice, or any other, from this software.
 
 (ns cynojure.util
-  (:use cynojure.cl)
+  (:use clojure.contrib.seq-utils)
   (:import (java.security MessageDigest)
-	   (java.io ByteArrayInputStream)))
+	   (java.io ByteArrayInputStream))
+  (:use cynojure.cl))
 
 (defun tostr [arg]
   "Return a usable string representation of the specified arg."
@@ -38,9 +39,9 @@ arg. e.g,
    (dotted-to-ip \"127.0.0.1\") => 2130706433"
   (let [[[b1 _] [b2 _] [b3 _] [b4 _]] (re-seq #"([0-9]+)" dotted)]
     (bit-or (bit-or (bit-or (bit-shift-left (new Integer b1) 24)
-			    (bit-shift-left (new Integer b2) 16))
-		    (bit-shift-left (new Integer b3) 8))
-	    (new Integer b4))))
+                            (bit-shift-left (new Integer b2) 16))
+                    (bit-shift-left (new Integer b3) 8))
+            (new Integer b4))))
 
 ;; (dotted-to-ip "127.0.0.1")
 
@@ -49,10 +50,10 @@ arg. e.g,
 
   (ip-to-dotted (dotted-to-ip \"127.0.0.1\")) => \"127.0.0.1\""
   (format "%d.%d.%d.%d"
-	  (bit-and (bit-shift-right ip 24) 0xff)
-	  (bit-and (bit-shift-right ip 16) 0xff)
-	  (bit-and (bit-shift-right ip 8) 0xff)
-	  (bit-and ip 0xff)))
+          (bit-and (bit-shift-right ip 24) 0xff)
+          (bit-and (bit-shift-right ip 16) 0xff)
+          (bit-and (bit-shift-right ip 8) 0xff)
+          (bit-and ip 0xff)))
 
 ;; (ip-to-dotted (dotted-to-ip "127.0.0.1"))
 
@@ -61,9 +62,9 @@ arg. e.g,
   (let [digest (MessageDigest/getInstance "MD5")]
     (.update digest (.getBytes message))
     (let [byte-arr (.digest digest)
-	  bigint (new BigInteger 1 byte-arr)
-	  bigint-str (.toString bigint 16)
-	  leading-zeros (apply str (replicate (- 32 (count bigint-str)) \0))]
+          bigint (new BigInteger 1 byte-arr)
+          bigint-str (.toString bigint 16)
+          leading-zeros (apply str (replicate (- 32 (count bigint-str)) \0))]
       (str leading-zeros bigint-str))))
 
 ;; (md5-sum "foobar")
@@ -86,9 +87,27 @@ arg. e.g,
 
   (foreach print '(a b c 1 2 3)) => nil
   abc123"
-  (loop [s seq]
-    (when (not (empty? s))
-      (f (first s))
-      (recur (rest s)))))
+  (when-not (empty? seq)
+    (f (first seq))
+    (recur f (rest seq))))
 
 ;; (foreach print '(a b c))
+
+(defun csv-escape [s]
+  "Escape the specified string per CSV rules.
+
+  (csv-escape \"foo's, goal\") =>
+  \"\\\"foo''s, goal\\\"\""
+  (let [quotep (includes? s \,)]
+    (apply str
+	   (concat
+	    (if quotep "\"" "")
+	    (replace {\" "\"\"" \' "''"} s)
+	    (if quotep "\"" "")))))
+
+;; (csv-escape "foo's, goal")
+
+(defun uuid []
+  (.toString (java.util.UUID/randomUUID)))
+
+;; (uuid)
