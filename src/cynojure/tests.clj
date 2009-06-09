@@ -28,17 +28,16 @@
 
 (deftest test-sql
   (is (= (sql (sql-and (sql->= 'age 20) (sql-like 'name "%smith%")))
-	 "((age >= 20) and (name like '%smith%'))"
-	 ))
+         "((age >= 20) and (name like '%smith%'))"))
   (is (= (query-str "count(1)"
-		    :from 'person
-		    :where (sql-and (sql->= 'age 20) (sql-<= 'age 40))
-		    :order-by '((name asc) (id desc)))
-	 "select count(1) from person where ((age >= 20) and (age <= 40)) order by name asc,id desc"))
+                    :from 'person
+                    :where (sql-and (sql->= 'age 20) (sql-<= 'age 40))
+                    :order-by '((name asc) (id desc)))
+         "select count(1) from person where ((age >= 20) and (age <= 40)) order by name asc,id desc"))
   (is (= (update-str 'person
-		     {:name "Alice", :age 30},
-		     :where (sql-= 'id 123))
-	 "update person set name=?,age=? where (id = 123)"))
+                     {:name "Alice", :age 30},
+                     :where (sql-= 'id 123))
+         "update person set name=?,age=? where (id = 123)"))
   (is (pr-str (sql-and (sql->= 'age 20) (sql-<= 'age "foo")))
       "((age >= 20) and (age <= 40))"))
 
