@@ -53,9 +53,9 @@
   (cond
     (string? expr) (printf "'%s'" expr)
     (seq? expr) (do
-		  (print "(")
-		  (foreach emit (interpose \space expr))
-		  (print ")"))
+                  (print "(")
+                  (foreach emit (interpose \space expr))
+                  (print ")"))
     :else (print expr)))
 
 (defun sql [sexpr]
@@ -69,13 +69,13 @@
   "Return a SQL SELECT query string, for the specified args.
 
   (query-str \"count(1)\"
-	     :from 'person
-	     :where (sql-and (sql->= 'age 20)
-			     (sql-<= 'age 40))
-	     :order-by '((name asc) (id desc)))"
+             :from 'person
+             :where (sql-and (sql->= 'age 20)
+                             (sql-<= 'age 40))
+             :order-by '((name asc) (id desc)))"
   (with-out-str
     (print "select" (sql-list* what)
-	   "from" (sql-list* from))
+           "from" (sql-list* from))
     (when where (print " where" (if (string? where) where (sql where))))
     (when order-by (print " order by" (sql-pairs* order-by)))
     (when group-by (print " group by" (sql-list* group-by)))
@@ -86,19 +86,19 @@
   "Perform SELECT COUNT(1) using the specified FROM and WHERE
   clauses."
   (with-query-results rs
-      (query-str "count(1)" :from from :where where)
+      [(query-str "count(1) as count" :from from :where where)]
     (:count (first rs))))
 
 (defun update-str [table value-map :key where]
   "Return a SQL UPDATE command string using the specified args.
 
   (update-str 'person
-	      {:name \"Alice\", :age 30},
-	      :where (sql-= 'id 123))"
+              {:name \"Alice\", :age 30},
+              :where (sql-= 'id 123))"
   (with-out-str
     (print "update" table
-	   "set" (str-join "," (map (fn [x] (str (tostr x) "=?")) (keys value-map)))
-	   "where" (if (string? where) where (sql where)))))
+           "set" (str-join "," (map (fn [x] (str (tostr x) "=?")) (keys value-map)))
+           "where" (if (string? where) where (sql where)))))
 
 (defun update [table value-map :key where]
   "Perform a SQL UPDATE command using the specified args."
@@ -111,5 +111,6 @@
 
 (defun sequence-next [seq-name]
   "Get next val of the specified sequence"
-  (with-query-results rs (format "select nextval('%s')" (tostr seq-name))
+  (with-query-results rs
+      [(format "select nextval('%s')" (tostr seq-name))]
     (:nextval (first rs))))
