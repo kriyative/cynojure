@@ -114,3 +114,20 @@
   (with-query-results rs
       [(format "select nextval('%s')" (tostr seq-name))]
     (:nextval (first rs))))
+
+(defn- xform-sym [sym hmap]
+  (let [xform (fn [s] (apply str (replace hmap s)))]
+    (if (keyword? sym)
+      (keyword (xform (name sym)))
+      (symbol (xform (name sym))))))
+
+(defun lispy-sym [sym] (xform-sym sym {\_ \-}))
+(defun sqly-sym [sym] (xform-sym sym {\- \_}))
+;; (sqly-sym (lispy-sym :foo_bar))
+
+(defun insert-object [table obj]
+  "Add `obj' to `table' using the clojure.contrib.sql/insert-values
+  function, after converting Lispy hyphen separated symbols in the
+  keys of `obj' to SQL friendly underscore separated ones,
+  i.e. `:foo-bar' becomes `:foo_bar'."
+  (insert-values (sqly-sym table) (map sqly-sym (keys obj)) (vals obj)))

@@ -24,7 +24,18 @@
   (is (= (ip-to-dotted (dotted-to-ip "127.0.0.1")) "127.0.0.1"))
   (is (= (md5-sum "foobar") "3858f62230ac3c915f300c664312c63f"))
   (is (not (nil? (get-classpaths))))
-  (is (not (nil? (get-system-classpaths)))))
+  (is (not (nil? (get-system-classpaths))))
+
+  (is (= (csv-escape "foo's, goal") "\"foo''s, goal\""))
+  (is (not (nil? (uuid))))
+  (is (= (parse-int "123") 123))
+  (is (nil? (parse-int "@bar")))
+  (is (= (.toString (parse-date "Tue, 09 Jun 2009 22:11:40 GMT")) "Tue Jun 09 15:11:40 PDT 2009"))
+  (is (= (.toString (parse-sql-date "Tue, 09 Jun 2009 22:11:40 GMT")) "2009-06-09"))
+  (is (= (.toString (parse-sql-timestamp "Tue, 09 Jun 2009 22:11:09 GMT")) "2009-06-09 15:11:09.0"))
+  (is (= (:host (parse-url "http://www.google.com/")) "www.google.com"))
+  (is (= (str-trim "abc123" 3) "abc"))
+  (is (= (str-trim "abc" 5) "abc")))
 
 (deftest test-sql
   (is (= (sql (sql-and (sql->= 'age 20) (sql-like 'name "%smith%")))

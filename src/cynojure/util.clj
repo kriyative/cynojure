@@ -27,7 +27,7 @@
 
 (defun mklist [arg]
   "Return arg if it's a list, otherwise return a new list containing
-arg. e.g,
+  arg. e.g,
 
   (mklist 'a) => '(a)
   (mklist '(a)) => '(a)"
@@ -108,6 +108,67 @@ arg. e.g,
 ;; (csv-escape "foo's, goal")
 
 (defun uuid []
+  "Return a UUID string."
   (.toString (java.util.UUID/randomUUID)))
 
 ;; (uuid)
+
+(defun parse-int [s :key error]
+  "Parse the string `s' as an integer. By default any parse errors are
+  suppressed, but if `error' is true, a java.lang.NumberFormatException
+  will be raised."
+  (if error
+    (Integer/parseInt s)
+    (try
+     (Integer/parseInt s)
+     (catch java.lang.NumberFormatException _ nil))))
+
+;; (parse-int "@5a")
+;; (parse-int "@5a" :error true)
+
+(defun parse-date [date-str :key format]
+  "Parse date-str using the optional format into a java.util.Date
+  object."
+  (let [parser (new java.text.SimpleDateFormat (or format "EEE, d MMM yyyy HH:mm:ss Z"))]
+    (.parse parser date-str)))
+
+;; (parse-date "Tue, 09 Jun 2009 22:11:40 GMT")
+
+(defun parse-sql-date [date-str :key format]
+  "Parse date-str using the optional format into a java.sql.Date
+  object."
+  (let [date (parse-date date-str :format format)]
+    (new java.sql.Date (.getTime date))))
+
+;; (parse-sql-date "Tue, 09 Jun 2009 22:11:40 GMT")
+
+(defun parse-sql-timestamp [date-str :key format]
+  "Parse date-str using the optional format into a java.sql.Timestamp
+  object."
+  (let [date (parse-date date-str :format format)]
+    (new java.sql.Timestamp (.getTime date))))
+
+;;  (parse-sql-timestamp "Tue, 09 Jun 2009 22:11:09 GMT")
+
+(def url-re
+     #"([a-z]+)://([-a-zA-Z0-9_.]+)(:[0-9]+)*[/]*([^#]*)(#\w+)*(\?.*)*")
+
+;; (re-seq url-re "http://google.com/foo/bar/biz#frag1?x=1&y=2")
+;; (re-seq url-re "http://google.com/foo/bar/biz")
+;; (["http://google.com/foo/bar/biz" "http" "google.com" nil "foo/bar/biz" nil nil])
+
+(defun parse-url [url]
+  "Parse the specified url, and return a map of its components."
+  (let [[_ scheme host port path frag query] (first (re-seq url-re url))]
+    {:scheme scheme
+     :host host
+     :port port
+     :path path
+     :fragment frag
+     :query query}))
+
+;; (parse-url "http://google.com/foo/bar/biz")
+
+(defun str-trim [s n]
+  "Trim the string `s' to a lengthh of no more than `n' characters."
+  (if (string? s) (subs s 0 (min (count s) n)) s))
