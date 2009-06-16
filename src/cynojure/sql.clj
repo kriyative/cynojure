@@ -44,6 +44,8 @@
 (defn- sql-pairs* [exprs]
   (apply sql-pairs (mklist exprs)))
 
+(declare sql-emit)
+
 (def *sql-expr-handlers*
      {:count (fn [op args]
 	       (print "count(")
