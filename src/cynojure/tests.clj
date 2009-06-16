@@ -38,18 +38,25 @@
   (is (= (str-trim "abc" 5) "abc")))
 
 (deftest test-sql
-  (is (= (sql (sql-and (sql->= 'age 20) (sql-like 'name "%smith%")))
+  (is (= (sql [:and [:>= :age 20] [:like :name "%smith%"]])
          "((age >= 20) and (name like '%smith%'))"))
-  (is (= (query-str "count(1)"
-                    :from 'person
-                    :where (sql-and (sql->= 'age 20) (sql-<= 'age 40))
-                    :order-by '((name asc) (id desc)))
-         "select count(1) from person where ((age >= 20) and (age <= 40)) order by name asc,id desc"))
+  (is (= (query-str [:count 1]
+                    :from :person
+                    :where [:and [:>= :age 20] [:<= :age 40] [:like :first-name "%smith%"]]
+                    :order-by '((:name :asc) (:id :desc)))
+	 "select count(1) from person where ((age >= 20) and (age <= 40) and (first_name like '%smith%')) order by name asc,id desc"))
+  (is (= (query-str [:as [:count 1] :cnt]
+                    :from :person
+                    :where [:>= :age 20])
+	 "select count(1) as cnt from person where (age >= 20)"))
+  (is (= (query-str '(:name :age :sex)
+		    :from :person
+		    :where [:and [:>= :age 20] [:<= :age 40]]
+		    :order-by '((:name :asc)))
+	 "select name,age,sex from person where ((age >= 20) and (age <= 40)) order by name asc"))
   (is (= (update-str 'person
                      {:name "Alice", :age 30},
-                     :where (sql-= 'id 123))
-         "update person set name=?,age=? where (id = 123)"))
-  (is (pr-str (sql-and (sql->= 'age 20) (sql-<= 'age "foo")))
-      "((age >= 20) and (age <= 40))"))
+                     :where [:= :id 123])
+         "update person set name=?,age=? where (id = 123)")))
 
 ;; (run-tests 'cynojure.tests)
