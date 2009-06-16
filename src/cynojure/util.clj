@@ -172,3 +172,28 @@
 (defun str-trim [s n]
   "Trim the string `s' to a lengthh of no more than `n' characters."
   (if (string? s) (subs s 0 (min (count s) n)) s))
+
+(defun perform-with-retry [fn :key [retries 5] sleep]
+  (loop [i 1]
+    (let [[r arg] (try
+		   [:ok (fn)]
+		   (catch Exception e [:error e]))]
+      (if (= r :ok)
+	arg
+	(if (< i retries)
+	  (do
+	    (if sleep (Thread/sleep sleep))
+	    (recur (+ i 1)))
+	  (throw arg))))))
+
+(defmacro with-retry [[& args] & body]
+  `(perform-with-retry (fn [] ~@body) ~@args))
+
+(comment
+  (perform-with-retry (fn [] (/ 5 0)) :retries 3)
+  
+  (with-retry []
+    (/ 5 0))
+  (with-retry [:retries 8]
+    (/ 5 0))
+  )
