@@ -38,3 +38,12 @@
 	       ~@(apply concat (map letk kargs))]
 	   ~@body))
       `(defn ~sym ~doc [~@pargs] ~@body))))
+
+(defun universal-time-to-date [universal-time]
+  "Convert a Common Lisp universal-time value to a java.util.Date
+  object."
+  (let [unix-epoch 2208988800
+	unix-time (- universal-time unix-epoch)]
+    (new java.util.Date (* unix-time 1000))))
+
+;; (universal-time-to-date 3356647006)
