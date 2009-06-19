@@ -89,11 +89,10 @@
 (defun query-str [what :key from where order-by group-by limit offset]
   "Return a SQL SELECT query string, for the specified args.
 
-  (query-str \"count(1)\"
-             :from 'person
-             :where (sql-and (sql->= 'age 20)
-                             (sql-<= 'age 40))
-             :order-by '((name asc) (id desc)))"
+  (query-str [:as [:count 1] :cnt]
+             :from :person
+             :where [:and [:>= :age 20] [:<= :age 40]])
+   => \"select count(1) as cnt from person where ((age >= 20) and (age <= 40))\""
   (with-out-str
     (print "select" (sql what)
            "from" (sql from))
@@ -113,9 +112,8 @@
 (defun update-str [table value-map :key where]
   "Return a SQL UPDATE command string using the specified args.
 
-  (update-str 'person
-              {:name \"Alice\", :age 30},
-              :where (sql-= 'id 123))"
+  (update-str :person {:name \"Alice\", :age 30} :where [:= :id 123])
+  => \"update :person set name=?,age=? where (id = 123)\""
   (with-out-str
     (print "update" table
            "set" (str-join "," (map (fn [x] (str (tostr x) "=?")) (keys value-map)))
