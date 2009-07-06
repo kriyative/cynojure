@@ -61,9 +61,7 @@
   "Generate a MD5 checksum of the specified message."
   (let [digest (MessageDigest/getInstance "MD5")]
     (.update digest (.getBytes message))
-    (let [byte-arr (.digest digest)
-          bigint (new BigInteger 1 byte-arr)
-          bigint-str (.toString bigint 16)
+    (let [bigint-str (.toString (new BigInteger 1 (.digest digest)) 16)
           leading-zeros (apply str (replicate (- 32 (count bigint-str)) \0))]
       (str leading-zeros bigint-str))))
 
@@ -170,10 +168,10 @@
 ;; (parse-url "http://google.com/foo/bar/biz")
 
 (defun str-trim [s n]
-  "Trim the string `s' to a lengthh of no more than `n' characters."
+  "Trim the string `s' to a length of no more than `n' characters."
   (if (string? s) (subs s 0 (min (count s) n)) s))
 
-(defun perform-with-retry [fn :key [retries 5] sleep]
+(defun perform-with-retry [fn :key [retries 5] sleep no-error]
   (loop [i 1]
     (let [[r arg] (try
 		   [:ok (fn)]
@@ -184,7 +182,7 @@
 	  (do
 	    (if sleep (Thread/sleep sleep))
 	    (recur (+ i 1)))
-	  (throw arg))))))
+	  (when-not no-error (throw arg)))))))
 
 (defmacro with-retry [[& args] & body]
   `(perform-with-retry (fn [] ~@body) ~@args))
@@ -194,6 +192,6 @@
   
   (with-retry []
     (/ 5 0))
-  (with-retry [:retries 8]
+  (with-retry [:retries 8 :no-error true]
     (/ 5 0))
   )
