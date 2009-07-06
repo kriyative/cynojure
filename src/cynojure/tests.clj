@@ -17,6 +17,10 @@
   (:use cynojure.util)
   (:use cynojure.sql))
 
+(deftest test-cl
+  (is (= (ignore-errors (+ 1 2)) 3))
+  (is (= (ignore-errors (/ 5 0)) nil)))
+
 (deftest test-util
   (is (= (tostr :foo) "foo"))
   (is (= (mklist 'a) '(a)))
