@@ -47,3 +47,11 @@
     (new java.util.Date (* unix-time 1000))))
 
 ;; (universal-time-to-date 3356647006)
+
+(defmacro ignore-errors [& body]
+  "Evaluate `body' and return its value, or catch any exception, which
+may be thrown, and return nil."
+  `(try
+    (do ~@body)
+    (catch Exception ex#
+      nil)))
