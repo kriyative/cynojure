@@ -26,7 +26,7 @@
 	letk (fn [k]
 	       (let [[nm val] (if (vector? k) k [k])
 		     kname (keyword (name nm))]
-		 `(~nm (or (~gkeys ~kname) ~val))))
+		 `(~nm (if (contains? ~gkeys ~kname) (~gkeys ~kname) ~val))))
 	doc (if (string? (first body)) (first body) "")
 	body (if (string? (first body)) (rest body) body)]
     (if kargs
