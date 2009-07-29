@@ -11,7 +11,8 @@
 ;; remove this notice, or any other, from this software.
 
 (ns cynojure.util
-  (:use clojure.contrib.seq-utils)
+  (:use clojure.contrib.seq-utils clojure.contrib.duck-streams
+        clojure.contrib.java-utils)
   (:import (java.security MessageDigest)
 	   (java.io ByteArrayInputStream))
   (:use cynojure.cl))
@@ -124,6 +125,16 @@
 ;; (parse-int "@5a")
 ;; (parse-int "@5a" :error true)
 
+(defun parse-double [s :key error]
+  "Parse the string `s' as a double precision floating point
+  number. By default any parse errors are suppressed, but if `error'
+  is true, a java.lang.NumberFormatException will be raised."
+  (if error
+    (Double/parseDouble s)
+    (try
+     (Double/parseDouble s)
+     (catch java.lang.NumberFormatException _ nil))))
+
 (defun parse-date [date-str :key format]
   "Parse date-str using the optional format into a java.util.Date
   object."
@@ -195,3 +206,21 @@
   (with-retry [:retries 8 :no-error true]
     (/ 5 0))
   )
+
+(defun sexp-reader [source]
+  "Wrap `source' in a reader suitable to pass to `read'."
+  (new java.io.PushbackReader (reader source)))
+
+(defun user-homedir-path [& [file-name]]
+  "Return the home dir path, with the optional file-name appended."
+  (str (java.lang.System/getProperty "user.home")
+       (java.lang.System/getProperty "file.separator")
+       file-name))
+
+;; (user-homedir-path)
+
+(defun file-name-non-directory [path]
+  "Return the non-directory (filename only) portion of `path'."
+  (.getName (file path)))
+
+;; (file-name-non-directory "/Users/foo/")
