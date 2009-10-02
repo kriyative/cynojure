@@ -17,6 +17,17 @@
 	   (java.io ByteArrayInputStream))
   (:use cynojure.cl))
 
+(defun str* [& args]
+  "Like `str', return a concatenated string of all the args, except
+convert keyword symbols to strings without a leading colon
+character. i.e., (str* :foo) => \"foo\""
+  (apply str (map #(if (instance? clojure.lang.Named %) (name %) (str %)) args)))
+
+(defun str*-join [sep coll]
+  "Like clojure.contrib/str-join, concatenates the `coll' using the
+`str*' function and delimit each element with `sep'."
+  (apply str* (interpose sep coll)))
+
 (defun tostr [arg]
   "Return a usable string representation of the specified arg."
   (cond
