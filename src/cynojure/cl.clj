@@ -39,14 +39,21 @@
 	   ~@body))
       `(defn ~sym ~doc [~@pargs] ~@body))))
 
+(defonce +unix-epoch+ 2208988800)
+
 (defun universal-time-to-date [universal-time]
   "Convert a Common Lisp universal-time value to a java.util.Date
   object."
-  (let [unix-epoch 2208988800
-	unix-time (- universal-time unix-epoch)]
-    (new java.util.Date (* unix-time 1000))))
+  (new java.util.Date (* (- universal-time +unix-epoch+) 1000)))
 
 ;; (universal-time-to-date 3356647006)
+
+(defun date-to-universal-time [date]
+  "Convert a java.util.Date to a Common Lisp universal-time value."
+  (+ +unix-epoch+ (/ (.getTime date) 1000)))
+
+;; (date-to-universal-time (universal-time-to-date 3356647006))
+;; (let [tm 3356647006] (= (date-to-universal-time (universal-time-to-date tm)) tm))
 
 (defmacro ignore-errors [& body]
   "Evaluate `body' and return its value, or catch any exception, which
