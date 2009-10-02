@@ -52,6 +52,9 @@
   "Find a bucket named `name'."
   (.getBucket s name))
 
+(defun s3-list-objects [bucket path :key [s *s3*]]
+  (.listObjects s bucket path "/" 1024))
+
 (defun s3-put-file [bucket path source :key content-type acl [s *s3*]]
   "Put a file in the specified `bucket' and `path' on S3. The arg
   `source' specifies the local file, and `content-type', and `acl' can
