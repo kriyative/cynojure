@@ -19,7 +19,9 @@
 
 (deftest test-cl
   (is (= (ignore-errors (+ 1 2)) 3))
-  (is (= (ignore-errors (/ 5 0)) nil)))
+  (is (= (ignore-errors (/ 5 0)) nil))
+  (is (let [tm 3356647006]
+        (= (date-to-universal-time (universal-time-to-date tm)) tm))))
 
 (deftest test-util
   (is (= (tostr :foo) "foo"))
