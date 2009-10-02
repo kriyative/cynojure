@@ -46,14 +46,33 @@
 
 (declare sql-emit)
 
+(defn sql-fn-handler [op args]
+  (print (str (name op) "("))
+  (sql-emit (first args))
+  (print ")"))
+
+(defn sql-math-handler [op args]
+  (print "(")
+  (sql-emit (first args))
+  (cond
+    (= op :div) (print "/")
+    (= op :product) (print "*"))
+  (sql-emit (second args))
+  (print ")"))
+
 (def *sql-expr-handlers*
-     {:count (fn [op args]
-	       (print "count(")
-	       (print (first args))
-	       (print ")"))
+     {:count sql-fn-handler
+      :sum sql-fn-handler
+      :round sql-fn-handler
       :as (fn [op [ex alias]]
 	    (sql-emit ex)
 	    (print " as" (sql-str alias)))
+      :null? (fn [op [col]]
+               (print (sql-str col) "is null"))
+      :not-null? (fn [op [col]]
+                   (print (sql-str col) "is not null"))
+      :div sql-math-handler
+      :product sql-math-handler
       :in (fn [op [c l]]
 	    (print "(")
 	    (print (sql-str c) (str "in (" (sql-list* l) ")"))
@@ -97,8 +116,8 @@
     (print "select" (sql what)
            "from" (sql from))
     (when where (print " where" (if (string? where) where (sql where))))
+    (when group-by (print " group by" (sql group-by)))
     (when order-by (print " order by" (sql-pairs* order-by)))
-    (when group-by (print " group by" (sql-list* group-by)))
     (when limit (print " limit" limit))
     (when offset (print " offset" offset))))
 
@@ -106,7 +125,7 @@
   "Perform SELECT COUNT(1) using the specified FROM and WHERE
   clauses."
   (with-query-results rs
-      [(query-str "count(1) as count" :from from :where where)]
+      [(query-str [:as [:count 1] :count] :from from :where where)]
     (:count (first rs))))
 
 (defun update-str [table value-map :key where]
@@ -115,8 +134,8 @@
   (update-str :person {:name \"Alice\", :age 30} :where [:= :id 123])
   => \"update :person set name=?,age=? where (id = 123)\""
   (with-out-str
-    (print "update" table
-           "set" (str-join "," (map (fn [x] (str (tostr x) "=?")) (keys value-map)))
+    (print "update" (sqly table)
+           "set" (str-join "," (map (fn [x] (str (sqly (name x)) "=?")) (keys value-map)))
            "where" (if (string? where) where (sql where)))))
 
 (defun update [table value-map :key where]
