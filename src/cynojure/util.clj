@@ -17,6 +17,16 @@
 	   (java.io ByteArrayInputStream))
   (:use cynojure.cl))
 
+(defun member [x sq :key [test =]]
+  (let [member1 (fn [x sq]
+                  (when (seq sq)
+                    (if (test x (first sq))
+                      sq
+                      (recur x (rest sq)))))]
+    (member1 x sq)))
+
+;; (member 1 '(2 3 4 5 1))
+
 (defun str* [& args]
   "Like `str', return a concatenated string of all the args, except
 convert keyword symbols to strings without a leading colon
@@ -235,3 +245,25 @@ character. i.e., (str* :foo) => \"foo\""
   (.getName (file path)))
 
 ;; (file-name-non-directory "/Users/foo/")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(def *log-level* (ref {:info false :debug false :warn true :error true}))
+
+(defn logger [level fmt & args]
+  (when (get @*log-level* level)
+    (apply printf fmt args)
+    (flush)))
+
+(defn log-enable [level]
+  (dosync (ref-set *log-level* (assoc @*log-level* level true))))
+
+;; (log-enable :info)
+;; @*log-level*
+
+(defn log-disable [level]
+  (dosync (ref-set *log-level* (dissoc @*log-level* level))))
+;; (log-disable :info)
+
+(defun string-input-stream [s]
+  (new java.io.StringBufferInputStream s))
