@@ -76,11 +76,11 @@
 
 ;;;;;;;;;;;;;;;; typica
 
-(defun sqs-get-queue [access-key secret-key qname]
+(defun sqs-get-queue [access-key secret-key qname :key [encoding? false]]
   "Return a SQS queue service using the credentials specified in
   `access-key' and `secret-key'."
   (let [q (com.xerox.amazonws.sqs2.SQSUtils/connectToQueue qname access-key secret-key)]
-    (.setEncoding q false)
+    (.setEncoding q encoding?)
     q))
 
 (def *sqs-queue* nil)
