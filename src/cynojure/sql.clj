@@ -21,7 +21,8 @@
     (cond
       (symbol? s) (symbol (subst (name s)))
       (keyword? s) (keyword (subst (name s)))
-      :else (subst s))))
+      (string? s) (subst s)
+      :else s)))
 
 (defun lispy [s] (sym-xform s {\_ \-}))
 (defun sqly [s] (sym-xform s {\- \_}))
@@ -33,79 +34,85 @@
     :else s))
 
 (defn- sql-list [& exprs]
-  (str-join "," exprs))
+  (str-join "," (map sql-str exprs)))
 
 (defn- sql-list* [exprs]
   (apply sql-list (mklist exprs)))
 
 (defn- sql-pairs [& exprs]
-  (str-join "," (map (fn [[k v]] (str (sql-str k) " " (sql-str v))) exprs)))
+  (str-join "," (map (fn [[k & v]] (str-join " " (cons (sql-str k) (map sql-str v)))) exprs)))
 
 (defn- sql-pairs* [exprs]
   (apply sql-pairs (mklist exprs)))
 
-(declare sql-emit)
+;;;;;;;;;;;;;;;;
 
-(defn sql-fn-handler [op args]
+(defn render-form-function [[op & args]]
   (print (str (name op) "("))
-  (sql-emit (first args))
+  (render (first args))
+  (doseq [arg (rest args)]
+    (print ",")
+    (render arg))
   (print ")"))
 
-(defn sql-math-handler [op args]
+(defmacro defsqlfun [name]
+  `(defmethod render-form ~name [& args#] (apply render-form-function args#)))
+
+(defn render-form-mathop [[op arg1 arg2]]
+  (print "(" (sqly arg1) (sql-str op) (sqly arg2) ")"))
+
+(defmacro defsqlmathop [name]
+  `(defmethod render-form ~name [& args#] (apply render-form-mathop args#)))
+
+(defmulti render-form "Render a SQL expression tree." {:private true} first)
+
+(defmethod render-form :as [[_ expr alias]]
+  (render-form expr)
+  (print " as" (sql-str alias)))
+
+(defmethod render-form :null? [[_ col]]
+  (print (sql-str col) "is null"))
+
+(defmethod render-form :not-null? [[_ col]]
+  (print (sql-str col) "is not null"))
+
+(defsqlfun :count)
+(defsqlfun :sum)
+(defsqlfun :round)
+(defsqlfun :not)
+
+(defmethod render-form :in [_ [c l]]
+  (print "(" (sql-str c) (str "in (" (sql-list* l) ")")))
+
+(declare render)
+
+(defmethod render-form :default [[op & args]]
   (print "(")
-  (sql-emit (first args))
-  (cond
-    (= op :div) (print "/")
-    (= op :product) (print "*"))
-  (sql-emit (second args))
+  (render (first args))
+  (doseq [arg (rest args)]
+    (print (str " " (sql-str op) " "))
+    (render arg))
   (print ")"))
 
-(def *sql-expr-handlers*
-     {:count sql-fn-handler
-      :sum sql-fn-handler
-      :round sql-fn-handler
-      :as (fn [op [ex alias]]
-	    (sql-emit ex)
-	    (print " as" (sql-str alias)))
-      :null? (fn [op [col]]
-               (print (sql-str col) "is null"))
-      :not-null? (fn [op [col]]
-                   (print (sql-str col) "is not null"))
-      :div sql-math-handler
-      :product sql-math-handler
-      :in (fn [op [c l]]
-	    (print "(")
-	    (print (sql-str c) (str "in (" (sql-list* l) ")"))
-	    (print ")"))})
-
-(defn- sql-emit-expr [[op & args]]
-  (if-let [handler (*sql-expr-handlers* op)]
-      (handler op args)
-    (do
-      (print "(")
-      (sql-emit (first args))
-      (doseq [arg (rest args)]
-	(print (str " " (sql-str op) " "))
-	(sql-emit arg))
-      (print ")"))))
-
-(defn- sql-emit-list [x]
-  (sql-emit (first x))
+(defn- render-list [x]
+  (render (first x))
   (doseq [e (rest x)]
     (print ",")
-    (sql-emit e)))
+    (render e)))
 
-(defun sql-emit [x]
+(defun render [x]
   (cond
-    (vector? x) (sql-emit-expr x)
-    (list? x) (sql-emit-list x)
+    (vector? x) (render-form x)
+    (list? x) (render-list x)
     (= x :all) (print "*")
     :else (print (sql-str x))))
 
 (defun sql [expr]
-  (with-out-str (sql-emit expr)))
+  (with-out-str (render expr)))
 
-(defun query-str [what :key from where order-by group-by limit offset]
+;;;;;;;;;;;;;;;;
+
+(defun query-str [what :key from where order-by group-by limit offset full-outer-join]
   "Return a SQL SELECT query string, for the specified args.
 
   (query-str [:as [:count 1] :cnt]
@@ -114,8 +121,12 @@
    => \"select count(1) as cnt from person where ((age >= 20) and (age <= 40))\""
   (with-out-str
     (print "select" (sql what)
-           "from" (sql from))
+           "from" (if (string? from) from (sql from)))
     (when where (print " where" (if (string? where) where (sql where))))
+    (when full-outer-join
+      (doseq [[join-table on-clause] full-outer-join]
+        (print " full outer join" (sql-str join-table) "on ")
+        (render on-clause)))
     (when group-by (print " group by" (sql group-by)))
     (when order-by (print " order by" (sql-pairs* order-by)))
     (when limit (print " limit" limit))
@@ -199,3 +210,20 @@
   parameters."
   [results sql-params & body]
   `(perform-with-resultset ~sql-params (fn [~results] ~@body)))
+
+(defun create-temp-table [table-name cols :key on-commit]
+  (str-join " "
+            ["create temp table"
+             (sql-str table-name)
+             "(" (sql-pairs* cols) ")"
+             (if on-commit (str "on commit " (sql-str on-commit)) "")]))
+
+(defun select [& args] (apply query-str args))
+(defun as [expr alias] (str "(" expr ") as " (sql-str alias)))
+
+(defun insert-into [table-name cols what]
+  (str-join " "
+            ["insert into"
+             (sql-str table-name)
+             (str "(" (sql-list* cols) ")")
+             (str "(" what ")")]))
