@@ -47,6 +47,8 @@
 
 ;;;;;;;;;;;;;;;;
 
+(declare render)
+
 (defn render-form-function [[op & args]]
   (print (str (name op) "("))
   (render (first args))
@@ -83,8 +85,6 @@
 
 (defmethod render-form :in [_ [c l]]
   (print "(" (sql-str c) (str "in (" (sql-list* l) ")")))
-
-(declare render)
 
 (defmethod render-form :default [[op & args]]
   (print "(")
