@@ -34,15 +34,46 @@
 	   (com.xerox.amazonws.sqs2 SQSUtils)
 	   (com.xerox.amazonws.sqs2 MessageQueue)
 	   (com.xerox.amazonws.sqs2 Message))
-  (:use cynojure.cl clojure.contrib.java-utils))
+  (:use clojure.contrib.duck-streams)
+  (:use cynojure.cl cynojure.util clojure.contrib.java-utils))
+
+(def *default-aws-authfile* (user-homedir-path ".awskeys.clj"))
+(def *default-aws-profile* nil)
+
+(defun load-aws-auth [:key
+                      [profile *default-aws-profile*]
+                      [authfile *default-aws-authfile*]]
+  "Load a specified AWS authentication `profile' from an
+`authfile' (default ~/.awskeys.clj). The awskeys.clj is of the
+following format:
+
+ {\"profile1\" [\"ACCESS-KEY\" \"SECRET-KEY\"] ...}
+
+where \"profile1\" can be any symbolic name passed in to the
+load-aws-auth function."
+  (let [auth-map (read (sexp-reader (file-str authfile)))]
+    (auth-map (or profile *default-aws-authfile*))))
+
+(def *aws-access-key* nil)
+(def *aws-secret-key* nil)
+
+(defmacro with-aws-profile
+  "See documentation of function `load-aws-auth'."
+  [[profile] & body]
+  `(binding [*default-aws-profile* ~profile]
+     (let [foo# (load-aws-auth)]
+       (binding [*aws-access-key* (first foo#)
+                 *aws-secret-key* (second foo#)]
+         ~@body))))
 
 (def *s3* nil)
 
-(defn s3-get-service [access-key secret-key]
+(defn s3-get-service [& [access-key secret-key]]
   "Return a S3 request service using the credentials specified in
   `access-key' and `secret-key'."
-  (let [aws-cred (new AWSCredentials access-key secret-key)]
-    (new RestS3Service aws-cred)))
+  (new RestS3Service (new AWSCredentials
+                          (or access-key *aws-access-key*)
+                          (or secret-key *aws-secret-key*))))
 
 (defun s3-create-bucket [name :key [s *s3*]]
   "Create a new bucket named `name'."
@@ -74,14 +105,37 @@
   `(binding [*s3* ~s]
      ~@body))
 
+(defmacro with-s3-service [[& [s]] & body]
+  "Create a S3 service binding, and invoke `body'."
+  `(binding [*s3* (or ~s (s3-get-service))]
+     ~@body))
+
 ;;;;;;;;;;;;;;;; typica
 
 (defun sqs-get-queue [access-key secret-key qname :key [encoding? false]]
   "Return a SQS queue service using the credentials specified in
   `access-key' and `secret-key'."
-  (let [q (com.xerox.amazonws.sqs2.SQSUtils/connectToQueue qname access-key secret-key)]
+  (let [q (com.xerox.amazonws.sqs2.SQSUtils/connectToQueue
+           qname
+           (or access-key *aws-access-key*)
+           (or secret-key *aws-secret-key*))]
     (.setEncoding q encoding?)
     q))
+
+(defun sqs-get-service [:key [access-key *aws-access-key*]
+                        [secret-key *aws-secret-key*]
+                        [secure? true]
+                        [server "queue.amazonaws.com"]]
+  (new com.xerox.amazonws.sqs2.QueueService access-key secret-key secure? server))
+
+(def *sqs* nil)
+(defmacro with-sqs-service [[& sqs-get-service-args] & body]
+  `(binding [*sqs* (sqs-get-service ~@sqs-get-service-args)]
+     ~@body))
+
+(defun sqs-get-message-queue [qname :key [s *sqs*]] (.getMessageQueue s qname))
+(defun sqs-get-or-create-message-queue [qname :key [s *sqs*]]
+  (.getOrCreateMessageQueue s qname))
 
 (def *sqs-queue* nil)
 
@@ -97,6 +151,10 @@
 (defun sqs-delete-message [m :key [queue *sqs-queue*]]
   "Delete the specified message `m' from `queue'."
   (.deleteMessage queue m))
+
+(defun sqs-send-message [msg :key [queue *sqs-queue*]]
+  "Send specified msg to `queue'."
+  (.sendMessage queue (if (string? msg) msg (.toString msg))))
 
 (defun sqs-message-body [m]
   "Get the message body of `m'."
