@@ -63,6 +63,72 @@
   (is (= (update-str 'person
                      {:name "Alice", :age 30},
                      :where [:= :id 123])
-         "update person set name=?,age=? where (id = 123)")))
+         "update person set name=?,age=? where (id = 123)"))
+  (is (= (create-temp-table :report-p-daily-d
+                            '((:p-id :bigint)
+                              (:d :integer :default 0))
+                            :on-commit :drop)
+         "create temp table report_p_daily_d ( p_id bigint,d integer default 0 ) on commit drop"))
+  (is (= (create-temp-table :report-p-daily-l1
+                            '((:p-id :bigint)
+                              (:ip-address :bigint)
+                              (:l1 :integer :default 0))
+                            :on-commit :drop)
+
+         "create temp table report_p_daily_l1 ( p_id bigint,ip_address bigint,l1 integer default 0 ) on commit drop"))
+  (is (= (insert-into :report-p-daily-d
+                      '(:p-id :d)
+                      (select '(:p-id [:count 1])
+                              :from :audit-log-entry
+                              :where [:and
+                                      [:= :o-id 1]
+                                      [:>= :ctime 3468470400]
+                                      [:< :ctime 3468556800]]
+                              :group-by :p-id))
+         "insert into report_p_daily_d (p_id,d) (select p_id,count(1) from audit_log_entry where ((o_id = 1) and (ctime >= 3468470400) and (ctime < 3468556800)) group by p_id)"))
+  (is (= (insert-into :report-p-daily-l2
+                      '(:p-id :l2)
+                      (select '(:p-id [:count 1])
+                              :from :audit-log-entry
+                              :where [:and
+                                      [:= :o-id 1]
+                                      [:>= :ctime 3468470400]
+                                      [:< :ctime 3468556800]
+                                      [:or [:like :user-agent "Mozilla%"] [:like :user-agent "Opera%"]]]
+                              :group-by :p-id))
+         "insert into report_p_daily_l2 (p_id,l2) (select p_id,count(1) from audit_log_entry where ((o_id = 1) and (ctime >= 3468470400) and (ctime < 3468556800) and ((user_agent like 'Mozilla%') or (user_agent like 'Opera%'))) group by p_id)"))
+
+  (is (= (insert-into :report-p-daily-s
+                      '(:p-id :s)
+                      (select '(:foo.p-id [:count 1])
+                              :from (as (select '(:p-id :ip-address)
+                                                :from :audit-log-entry
+                                                :where [:and
+                                                        [:= :o-id 1]
+                                                        [:>= :ctime 3468470400]
+                                                        [:< :ctime 3468556800]
+                                                        [:not [:or [:like :user-agent "Mozilla%"] [:like :user-agent "Opera%"]]]]
+                                                :group-by '(:p-id :ip-address))
+                                        :foo)
+                              :group-by :foo.p-id))
+         "insert into report_p_daily_s (p_id,s) (select foo.p_id,count(1) from (select p_id,ip_address from audit_log_entry where ((o_id = 1) and (ctime >= 3468470400) and (ctime < 3468556800) and not(((user_agent like 'Mozilla%') or (user_agent like 'Opera%')))) group by p_id,ip_address) as foo group by foo.p_id)"))
+
+  (is (= (insert-into :report-p-daily
+                      '(:ctime :p-id :d :s :l2 :l1)
+                      (select '(3468470400
+                                :report-p-daily-d.p-id
+                                :report-p-daily-d.d
+                                :report-p-daily-s.s
+                                :report-p-daily-l2.l2
+                                :report-p-daily-l1.l1)
+                              :from :report-p-daily-d
+                              :full-outer-join '((:report-p-daily-s
+                                                  [:= :report-p-daily-d.p-id :report-p-daily-s.p-id])
+                                                 (:report-p-daily-l2
+                                                  [:= :report-p-daily-d.p-id :report-p-daily-l2.p-id])
+                                                 (:report-p-daily-l1
+                                                  [:= :report-p-daily-d.p-id :report-p-daily-l1.p-id]))))
+         "insert into report_p_daily (ctime,p_id,d,s,l2,l1) (select 3468470400,report_p_daily_d.p_id,report_p_daily_d.d,report_p_daily_s.s,report_p_daily_l2.l2,report_p_daily_l1.l1 from report_p_daily_d full outer join report_p_daily_s on (report_p_daily_d.p_id = report_p_daily_s.p_id) full outer join report_p_daily_l2 on (report_p_daily_d.p_id = report_p_daily_l2.p_id) full outer join report_p_daily_l1 on (report_p_daily_d.p_id = report_p_daily_l1.p_id))"))  
+  )
 
 ;; (run-tests 'cynojure.tests)
