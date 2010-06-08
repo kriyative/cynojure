@@ -11,9 +11,9 @@
 ;; remove this notice, or any other, from this software.
 
 (ns cynojure.sql
-  (:use clojure.contrib.str-utils clojure.contrib.sql
-	clojure.contrib.sql.internal clojure.contrib.except
-	clojure.contrib.fcase)
+  (:use clojure.contrib.str-utils clojure.contrib.java-utils
+        clojure.contrib.sql clojure.contrib.sql.internal
+        clojure.contrib.except clojure.contrib.fcase)
   (:use cynojure.util cynojure.cl))
 
 (defn- sym-xform [s hmap]
@@ -25,90 +25,119 @@
       :else s)))
 
 (defun lispy [s] (sym-xform s {\_ \-}))
-(defun sqly [s] (sym-xform s {\- \_}))
+(defun sqly [s] (tostr (sym-xform s {\- \_})))
+
+(defun sql-str-escape [s]
+  (with-out-str
+    (loop [s s]
+      (let [ch (first s)]
+        (when-not (empty? s)
+          (print ch)
+          (cond
+            (= ch \') (let [ch2 (first (rest s))]
+                        (cond
+                          (or (nil? ch2) (not (= ch2 \'))) (print \')
+                          ch2 (print ch2))
+                        (recur (rest s)))
+            true (recur (rest s))))))))
+
+;; (sql-str-escape "foo'bar'")
 
 (defun sql-str [s]
   (cond
     (or (symbol? s) (keyword? s)) (sqly (name s))
-    (string? s) (str "'" s "'")
+    (string? s) (str "'" (sql-str-escape s) "'")
     :else s))
 
-(defn- sql-list [& exprs]
-  (str-join "," (map sql-str exprs)))
-
-(defn- sql-list* [exprs]
-  (apply sql-list (mklist exprs)))
+;; (sql-str "foo'bar")
 
 (defn- sql-pairs [& exprs]
-  (str-join "," (map (fn [[k & v]] (str-join " " (cons (sql-str k) (map sql-str v)))) exprs)))
-
+  (str-join ","
+            (map (fn [[k & v]]
+                   (str-join " " (cons (sql-str k) (map sql-str v)))) exprs)))
 (defn- sql-pairs* [exprs]
   (apply sql-pairs (mklist exprs)))
 
-;;;;;;;;;;;;;;;;
+(defun safely-first [x] (if (or (seq? x) (vector? x)) (first x) x))
 
-(declare render)
+(defmulti emit "Emit a SQL expression tree" safely-first)
 
-(defn render-form-function [[op & args]]
-  (print (str (name op) "("))
-  (render (first args))
+(defmethod emit :as [[_ expr alias]]
+  (emit expr)
+  (print " AS ")
+  (emit alias))
+
+(defmethod emit :null? [[_ col]]
+  (emit col)
+  (print " IS NULL"))
+
+(defmethod emit :not-null? [[_ col]]
+  (emit col)
+  (print " IS NOT NULL"))
+
+(defn emit-function [[op & args]]
+  (print (str (string-upcase (name op)) "("))
+  (emit (first args))
   (doseq [arg (rest args)]
     (print ",")
-    (render arg))
+    (emit arg))
   (print ")"))
 
 (defmacro defsqlfun [name]
-  `(defmethod render-form ~name [& args#] (apply render-form-function args#)))
-
-(defn render-form-mathop [[op arg1 arg2]]
-  (print "(" (sqly arg1) (sql-str op) (sqly arg2) ")"))
-
-(defmacro defsqlmathop [name]
-  `(defmethod render-form ~name [& args#] (apply render-form-mathop args#)))
-
-(defmulti render-form "Render a SQL expression tree." {:private true} first)
-
-(defmethod render-form :as [[_ expr alias]]
-  (render-form expr)
-  (print " as" (sql-str alias)))
-
-(defmethod render-form :null? [[_ col]]
-  (print (sql-str col) "is null"))
-
-(defmethod render-form :not-null? [[_ col]]
-  (print (sql-str col) "is not null"))
+  `(defmethod emit ~name [& args#] (apply emit-function args#)))
 
 (defsqlfun :count)
 (defsqlfun :sum)
 (defsqlfun :round)
 (defsqlfun :not)
+(defsqlfun :nextval)
 
-(defmethod render-form :in [_ [c l]]
-  (print "(" (sql-str c) (str "in (" (sql-list* l) ")")))
-
-(defmethod render-form :default [[op & args]]
+(defn emit-infix [[op & args]]
   (print "(")
-  (render (first args))
+  (emit (first args))
   (doseq [arg (rest args)]
-    (print (str " " (sql-str op) " "))
-    (render arg))
+    (print " ")
+    (print (string-upcase (name op)))
+    (print " ")
+    (emit arg))
   (print ")"))
 
-(defn- render-list [x]
-  (render (first x))
+(defmacro defsqlinfix [name]
+  `(defmethod emit ~name [& args#] (apply emit-infix args#)))
+
+(defsqlinfix :and)
+(defsqlinfix :or)
+(defsqlinfix :<)
+(defsqlinfix :<=)
+(defsqlinfix :>)
+(defsqlinfix :>=)
+(defsqlinfix :=)
+(defsqlinfix :like)
+
+(defmethod emit :in [[_ c l]]
+  (print "(")
+  (emit c)
+  (print " IN ")
+  (emit l)
+  (print ")"))
+
+(defun emit-list [x]
+  (print "(")
+  (emit (first x))
   (doseq [e (rest x)]
     (print ",")
-    (render e)))
+    (emit e))
+  (print ")"))
 
-(defun render [x]
+(defmethod emit :default [expr]
   (cond
-    (vector? x) (render-form x)
-    (list? x) (render-list x)
-    (= x :all) (print "*")
-    :else (print (sql-str x))))
+    (vector? expr) (emit-list expr)
+    (list? expr) (emit-list expr)
+    (= expr :all) (print "*")
+    :else (print (sql-str expr))))
 
 (defun sql [expr]
-  (with-out-str (render expr)))
+  (with-out-str (emit expr)))
 
 ;;;;;;;;;;;;;;;;
 
@@ -120,17 +149,17 @@
              :where [:and [:>= :age 20] [:<= :age 40]])
    => \"select count(1) as cnt from person where ((age >= 20) and (age <= 40))\""
   (with-out-str
-    (print "select" (sql what)
-           "from" (if (string? from) from (sql from)))
-    (when where (print " where" (if (string? where) where (sql where))))
+    (print "SELECT" (sql what)
+           "FROM" (if (string? from) from (sql from)))
+    (when where (print " WHERE" (if (string? where) where (sql where))))
     (when full-outer-join
       (doseq [[join-table on-clause] full-outer-join]
-        (print " full outer join" (sql-str join-table) "on ")
-        (render on-clause)))
-    (when group-by (print " group by" (sql group-by)))
-    (when order-by (print " order by" (sql-pairs* order-by)))
-    (when limit (print " limit" limit))
-    (when offset (print " offset" offset))))
+        (print " FULL OUTER JOIN" (sql-str join-table) "ON ")
+        (emit on-clause)))
+    (when group-by (print " GROUP BY" (sql group-by)))
+    (when order-by (print " ORDER BY" (sql-pairs* order-by)))
+    (when limit (print " LIMIT" limit))
+    (when offset (print " OFFSET" offset))))
 
 (defun count-rows [:key from where]
   "Perform SELECT COUNT(1) using the specified FROM and WHERE
@@ -145,9 +174,10 @@
   (update-str :person {:name \"Alice\", :age 30} :where [:= :id 123])
   => \"update :person set name=?,age=? where (id = 123)\""
   (with-out-str
-    (print "update" (sqly table)
-           "set" (str-join "," (map (fn [x] (str (sqly (name x)) "=?")) (keys value-map)))
-           "where" (if (string? where) where (sql where)))))
+    (print "UPDATE" (sqly table)
+           "SET"
+           (str-join "," (map (fn [x] (str (sqly (name x)) "=?")) (keys value-map)))
+           "WHERE" (if (string? where) where (sql where)))))
 
 (defun update [table value-map :key where]
   "Perform a SQL UPDATE command using the specified args."
@@ -155,21 +185,16 @@
 
 (defun create-sequence [seq-name]
   "Create a sequence called seq-name."
-  (do-commands
-   (format "create sequence %s" (tostr seq-name))))
+  (format "CREATE SEQUENCE %s" (tostr seq-name)))
+
+(defun drop-sequence [seq-name]
+  (format "DROP SEQUENCE IF EXISTS %s" (tostr seq-name)))
 
 (defun sequence-next [seq-name]
   "Get next val of the specified sequence"
   (with-query-results rs
-      [(format "select nextval('%s')" (tostr seq-name))]
+      [(format "SELECT NEXTVAL('%s')" (tostr seq-name))]
     (:nextval (first rs))))
-
-(defun insert-object [table obj]
-  "Add `obj' to `table' using the clojure.contrib.sql/insert-values
-  function, after converting Lispy hyphen separated symbols in the
-  keys of `obj' to SQL friendly underscore separated ones,
-  i.e. `:foo-bar' becomes `:foo_bar'."
-  (insert-values (sqly table) (map sqly (keys obj)) (vals obj)))
 
 ;; lifted from clojure/core.clj -- call lispy on the column names
 ;; before making keywords out of them; this ensures they look more
@@ -178,19 +203,56 @@
   "Creates and returns a lazy sequence of structmaps corresponding to
   the rows in the java.sql.ResultSet rs"
   [rs]
-  (let [rsmeta (. rs (getMetaData))
-	idxs (range 1 (inc (. rsmeta (getColumnCount))))
+  (let [rsmeta (.getMetaData rs)
+	idxs (range 1 (inc (.getColumnCount rsmeta)))
 	keys (map (comp keyword lispy #(.toLowerCase #^String %))
-		  (map (fn [i] (. rsmeta (getColumnLabel i))) idxs))
+		  (map (fn [i] (.getColumnLabel rsmeta i)) idxs))
 	check-keys (or (apply distinct? keys)
 		       (throw (Exception. "ResultSet must have unique column labels")))
 	row-struct (apply create-struct keys)
-	row-values (fn [] (map (fn [#^Integer i] (. rs (getObject i))) idxs))
+	row-values (fn [] (map (fn [#^Integer i] (.getObject rs i)) idxs))
 	rows (fn thisfn []
 	       (lazy-seq
-		 (when (. rs (next))
+		 (when (.next rs)
 		   (cons (apply struct row-struct (row-values)) (thisfn)))))]
     (rows)))
+
+(defun do-insert-get-pkeys [sql param-group]
+  (with-open [stmt (.prepareStatement (connection) sql)]
+    (doseq [[index value] (map vector (iterate inc 1) param-group)]
+      (.setObject stmt index value))
+    (transaction
+     (.execute stmt)
+     (if (and (< 0 (.getUpdateCount stmt)) (.getMoreResults stmt))
+       (let [rs (.getResultSet stmt)]
+         (loop [pkeys []]
+           (if (.next rs)
+             (recur (conj pkeys (.getObject rs 1)))
+             pkeys)))))))
+
+(defun insert-values-get-pkeys [table column-names value-group :key sequence-name]
+  "Derived from clojure.contrib.sql/insert-values, returns a ResultSet
+seq of the auto generated pkeys in this insert."
+  (let [column-strs (map as-str column-names)
+        n (count value-group)
+        template (apply str (interpose "," (replicate n "?")))
+        columns (if (seq column-names)
+                  (format "(%s)" (apply str (interpose "," column-strs)))
+                  "")]
+    (do-insert-get-pkeys (str (format "INSERT INTO %s %s VALUES (%s)"
+                                      (as-str table) columns template)
+                              (if sequence-name
+                                (format "; SELECT CURRVAL('%s')" (tostr sequence-name))
+                                ""))
+                         value-group)))
+
+(defun insert-object [table obj :key sequence-name]
+  "Add `obj' to `table' using the clojure.contrib.sql/insert-values
+  function, after converting Lispy hyphen separated symbols in the
+  keys of `obj' to SQL friendly underscore separated ones,
+  i.e. `:foo-bar' becomes `:foo_bar'."
+  (insert-values-get-pkeys (sqly table) (map sqly (keys obj)) (vals obj)
+                           :sequence-name sequence-name))
 
 ;; based on with-query-results* from clojure.contrib/sql/internal.clj
 ;; -- override resultset-sql with lispy-resultset-seq
@@ -211,19 +273,50 @@
   [results sql-params & body]
   `(perform-with-resultset ~sql-params (fn [~results] ~@body)))
 
+(defun create-table* [table-name cols & postscript]
+  (str-join " "
+            ["CREATE TABLE"
+             (sql-str table-name)
+             "("
+             (str-join ","
+                       (map (fn [[k & v]]
+                              (str-join " " (cons (sql k) (map sql v))))
+                            cols))
+             (if postscript (str "," (str-join "," postscript)) "")
+             ")"]))
+
+(defun drop-table* [table-name]
+  (str-join " " ["DROP TABLE IF EXISTS" (sql-str table-name)]))
+
 (defun create-temp-table [table-name cols :key on-commit]
   (str-join " "
-            ["create temp table"
+            ["CREATE TEMP TABLE"
              (sql-str table-name)
              "(" (sql-pairs* cols) ")"
-             (if on-commit (str "on commit " (sql-str on-commit)) "")]))
+             (if on-commit (str "ON COMMIT " (sql-str on-commit)) "")]))
 
 (defun select [& args] (apply query-str args))
 (defun as [expr alias] (str "(" expr ") as " (sql-str alias)))
 
+(defun select1 [& query-args]
+  (with-resultset rs
+    (apply query-str query-args)
+    (first rs)))
+
 (defun insert-into [table-name cols what]
   (str-join " "
-            ["insert into"
+            ["INSERT INTO"
              (sql-str table-name)
-             (str "(" (sql-list* cols) ")")
+             (with-out-str (emit-list cols))
              (str "(" what ")")]))
+
+(defun create-index [name table cols]
+  (str-join " "
+            ["CREATE INDEX"
+             (sql-str name)
+             "ON"
+             (sql-str table)
+             (with-out-str (emit-list cols))]))
+
+(defun drop-index [name]
+  (str-join " " ["DROP INDEX" "IF EXISTS" (sql-str name) ]))
