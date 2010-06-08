@@ -53,7 +53,7 @@ character. i.e., (str* :foo) => \"foo\""
 
   (mklist 'a) => '(a)
   (mklist '(a)) => '(a)"
-  (if (list? arg) arg (list arg)))
+  (if (seq? arg) arg (list arg)))
 
 (defun dotted-to-ip [dotted]
   "Convert a dotted notation IPv4 address string to a 32-bit integer. e.g.,
@@ -267,3 +267,13 @@ character. i.e., (str* :foo) => \"foo\""
 
 (defun string-input-stream [s]
   (new java.io.StringBufferInputStream s))
+
+(defun string= [s1 s2]
+  "Returns boolean result of case insensitive comparison of strings s1
+and s2. e.g.,
+
+  (string= \"foobar\" \"FooBar\") => true"
+  (= (.toLowerCase s1) (.toLowerCase s2)))
+
+(defun string-upcase [s] (.toUpperCase s))
+(defun string-downcase [s] (.toLowerCase s))
