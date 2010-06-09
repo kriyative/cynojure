@@ -277,3 +277,5 @@ and s2. e.g.,
 
 (defun string-upcase [s] (.toUpperCase s))
 (defun string-downcase [s] (.toLowerCase s))
+
+(defun char-numeric? [c] (<= (int \0) (int c) (int \9)))

@@ -112,6 +112,7 @@
 (defsqlinfix :>)
 (defsqlinfix :>=)
 (defsqlinfix :=)
+(defsqlinfix :<>)
 (defsqlinfix :like)
 
 (defmethod emit :in [[_ c l]]

@@ -43,6 +43,8 @@
   (is (= (str-trim "abc" 5) "abc"))
 
   (is (= (string= "foobar" "FooBar") true))
+  (is (= (char-numeric? \5) true))
+  (is (= (char-numeric? \a) false))
   )
 
 (deftest test-sql
