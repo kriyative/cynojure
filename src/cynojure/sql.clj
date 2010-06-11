@@ -14,7 +14,8 @@
   (:use clojure.contrib.str-utils clojure.contrib.java-utils
         clojure.contrib.sql clojure.contrib.sql.internal
         clojure.contrib.except clojure.contrib.fcase)
-  (:use cynojure.util cynojure.cl))
+  (:use cynojure.util cynojure.cl)
+  (:import (java.sql BatchUpdateException DriverManager SQLException Statement)))
 
 (defn- sym-xform [s hmap]
   (let [subst (fn [s] (apply str (replace hmap s)))]
@@ -122,13 +123,13 @@
   (emit l)
   (print ")"))
 
-(defun emit-list [x]
-  (print "(")
+(defun emit-list [x :key no-parens?]
+  (when-not no-parens? (print "("))
   (emit (first x))
   (doseq [e (rest x)]
     (print ",")
     (emit e))
-  (print ")"))
+  (when-not no-parens? (print ")")))
 
 (defmethod emit :default [expr]
   (cond
@@ -142,6 +143,45 @@
 
 ;;;;;;;;;;;;;;;;
 
+(def *transaction-commit-hooks* nil)
+
+(defun add-transaction-commit-hook [fun]
+  (dosync (alter *transaction-commit-hooks* conj fun)))
+
+(defun perform-with-transaction [func]
+  "Imported from clojure.contrib.sql.internal, and extended with the
+  transaction-commit-hooks behavior."
+  (binding [*db* (update-in *db* [:level] inc)
+            *transaction-commit-hooks* (ref [])]
+    (if (= (:level *db*) 1)
+      (let [con (connection*)
+            auto-commit (.getAutoCommit con)]
+        (io!
+         (.setAutoCommit con false)
+         (let [result (try
+                        (func)
+                        (catch BatchUpdateException e
+                          (print-update-counts *err* e)
+                          (print-sql-exception-chain *err* e)
+                          (throw-rollback e))
+                        (catch SQLException e
+                          (print-sql-exception-chain *err* e)
+                          (throw-rollback e))
+                        (catch Exception e
+                          (throw-rollback e))
+                        (finally
+                         (if (rollback)
+                           (.rollback con)
+                           (.commit con))
+                         (rollback false)
+                         (.setAutoCommit con auto-commit)))]
+           (doseq [hook (deref *transaction-commit-hooks*)] (hook))
+           result)))
+      (func))))
+
+(defmacro with-transaction [& body]
+  `(perform-with-transaction (fn [] ~@body)))
+
 (defun query-str [what :key from where order-by group-by limit offset full-outer-join]
   "Return a SQL SELECT query string, for the specified args.
 
@@ -150,8 +190,13 @@
              :where [:and [:>= :age 20] [:<= :age 40]])
    => \"select count(1) as cnt from person where ((age >= 20) and (age <= 40))\""
   (with-out-str
-    (print "SELECT" (sql what)
-           "FROM" (if (string? from) from (sql from)))
+    (print "SELECT" (if (list? what)
+                      (with-out-str (emit-list what :no-parens? true))
+                      (sql what))
+           "FROM" (cond
+                   (string? from) from
+                   (list? from) (with-out-str (emit-list from :no-parens? true))
+                   true (sql from)))
     (when where (print " WHERE" (if (string? where) where (sql where))))
     (when full-outer-join
       (doseq [[join-table on-clause] full-outer-join]
@@ -222,14 +267,13 @@
   (with-open [stmt (.prepareStatement (connection) sql)]
     (doseq [[index value] (map vector (iterate inc 1) param-group)]
       (.setObject stmt index value))
-    (transaction
-     (.execute stmt)
-     (if (and (< 0 (.getUpdateCount stmt)) (.getMoreResults stmt))
-       (let [rs (.getResultSet stmt)]
-         (loop [pkeys []]
-           (if (.next rs)
-             (recur (conj pkeys (.getObject rs 1)))
-             pkeys)))))))
+    (.execute stmt)
+    (if (and (< 0 (.getUpdateCount stmt)) (.getMoreResults stmt))
+      (let [rs (.getResultSet stmt)]
+        (loop [pkeys []]
+          (if (.next rs)
+            (recur (conj pkeys (.getObject rs 1)))
+            pkeys))))))
 
 (defun insert-values-get-pkeys [table column-names value-group :key sequence-name]
   "Derived from clojure.contrib.sql/insert-values, returns a ResultSet
