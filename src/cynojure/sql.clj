@@ -203,7 +203,7 @@
         (print " FULL OUTER JOIN" (sql-str join-table) "ON ")
         (emit on-clause)))
     (when group-by (print " GROUP BY" (sql group-by)))
-    (when order-by (print " ORDER BY" (sql-pairs* order-by)))
+    (when order-by (print " ORDER BY" (sql-pairs* (apply vector (mklist order-by)))))
     (when limit (print " LIMIT" limit))
     (when offset (print " OFFSET" offset))))
 
