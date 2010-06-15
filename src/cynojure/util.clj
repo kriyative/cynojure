@@ -12,7 +12,7 @@
 
 (ns cynojure.util
   (:use clojure.contrib.seq-utils clojure.contrib.duck-streams
-        clojure.contrib.java-utils)
+        clojure.contrib.java-utils clojure.contrib.fcase)
   (:import (java.security MessageDigest)
 	   (java.io ByteArrayInputStream))
   (:use cynojure.cl))
@@ -179,6 +179,20 @@ character. i.e., (str* :foo) => \"foo\""
     (new java.sql.Timestamp (.getTime date))))
 
 ;;  (parse-sql-timestamp "Tue, 09 Jun 2009 22:11:09 GMT")
+
+(defun format-date [date :key format]
+  (let [date (case (class date)
+                   java.util.Date date
+                   java.sql.Date (new java.util.Date (.getTime date))
+                   java.sql.Timestamp (new java.util.Date (.getTime date)))
+        formatter (new java.text.SimpleDateFormat (or format
+                                                      "EEE, d MMM yyyy HH:mm:ss Z"))]
+    (.format formatter date)))
+
+;; (format-date (new java.util.Date))
+;; (format-date (new java.sql.Date) :format )
+
+(defun format-iso8601-date [date] (format-date date :format "yyyy-MM-dd'T'HH:mm:ssZ"))
 
 (def url-re
      #"([a-z]+)://([-a-zA-Z0-9_.]+)(:[0-9]+)*[/]*([^#]*)(#\w+)*(\?.*)*")
