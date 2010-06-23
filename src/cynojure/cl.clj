@@ -48,9 +48,9 @@
 
 ;; (universal-time-to-date 3356647006)
 
-(defun date-to-universal-time [date]
+(defun date-to-universal-time [& [date]]
   "Convert a java.util.Date to a Common Lisp universal-time value."
-  (+ +unix-epoch+ (int (/ (.getTime date) 1000))))
+  (+ +unix-epoch+ (int (/ (.getTime (or date (new java.util.Date))) 1000))))
 
 ;; (date-to-universal-time (universal-time-to-date 3356647006))
 ;; (let [tm 3356647006] (= (date-to-universal-time (universal-time-to-date tm)) tm))
