@@ -1,3 +1,5 @@
 *~
 /classes
-/cynojure.jar
+/cynojure*.jar
+/lib
+/pom.xml
