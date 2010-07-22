@@ -59,7 +59,7 @@
   (is (= (query-str [:count 1]
                     :from :person
                     :where [:and [:>= :age 20] [:<= :age 40] [:like :first-name "%smith%"]]
-                    :order-by '((:name :asc) (:id :desc)))
+                    :order-by '((:name :asc) (:id :desc)))         
          "SELECT COUNT(1) FROM person WHERE ((age >= 20) AND (age <= 40) AND (first_name LIKE '%smith%')) ORDER BY name asc,id desc"))
   (is (= (query-str [:as [:count 1] :cnt]
                     :from :person
@@ -69,7 +69,7 @@
 		    :from :person
 		    :where [:and [:>= :age 20] [:<= :age 40]]
 		    :order-by '((:name :asc)))
-         "SELECT (name,age,sex) FROM person WHERE ((age >= 20) AND (age <= 40)) ORDER BY name asc"))
+         "SELECT name,age,sex FROM person WHERE ((age >= 20) AND (age <= 40)) ORDER BY name asc"))
   (is (= (update-str 'person
                      {:name "Alice", :age 30},
                      :where [:= :id 123])
@@ -94,7 +94,7 @@
                                       [:>= :ctime 3468470400]
                                       [:< :ctime 3468556800]]
                               :group-by :p-id))
-         "INSERT INTO report_p_daily_d (p_id,d) (SELECT (p_id,COUNT(1)) FROM audit_log_entry WHERE ((o_id = 1) AND (ctime >= 3468470400) AND (ctime < 3468556800)) GROUP BY p_id)"))
+         "INSERT INTO report_p_daily_d (p_id,d) (SELECT p_id,COUNT(1) FROM audit_log_entry WHERE ((o_id = 1) AND (ctime >= 3468470400) AND (ctime < 3468556800)) GROUP BY p_id)"))
   (is (= (insert-into :report-p-daily-l2
                       '(:p-id :l2)
                       (select '(:p-id [:count 1])
@@ -105,7 +105,7 @@
                                       [:< :ctime 3468556800]
                                       [:or [:like :user-agent "Mozilla%"] [:like :user-agent "Opera%"]]]
                               :group-by :p-id))
-         "INSERT INTO report_p_daily_l2 (p_id,l2) (SELECT (p_id,COUNT(1)) FROM audit_log_entry WHERE ((o_id = 1) AND (ctime >= 3468470400) AND (ctime < 3468556800) AND ((user_agent LIKE 'Mozilla%') OR (user_agent LIKE 'Opera%'))) GROUP BY p_id)"))
+         "INSERT INTO report_p_daily_l2 (p_id,l2) (SELECT p_id,COUNT(1) FROM audit_log_entry WHERE ((o_id = 1) AND (ctime >= 3468470400) AND (ctime < 3468556800) AND ((user_agent LIKE 'Mozilla%') OR (user_agent LIKE 'Opera%'))) GROUP BY p_id)"))
   (is (= (insert-into :report-p-daily-s
                       '(:p-id :s)
                       (select '(:foo.p-id [:count 1])
@@ -119,7 +119,7 @@
                                                 :group-by '(:p-id :ip-address))
                                         :foo)
                               :group-by :foo.p-id))
-         "INSERT INTO report_p_daily_s (p_id,s) (SELECT (foo.p_id,COUNT(1)) FROM (SELECT (p_id,ip_address) FROM audit_log_entry WHERE ((o_id = 1) AND (ctime >= 3468470400) AND (ctime < 3468556800) AND NOT(((user_agent LIKE 'Mozilla%') OR (user_agent LIKE 'Opera%')))) GROUP BY (p_id,ip_address)) as foo GROUP BY foo.p_id)"))
+         "INSERT INTO report_p_daily_s (p_id,s) (SELECT foo.p_id,COUNT(1) FROM (SELECT p_id,ip_address FROM audit_log_entry WHERE ((o_id = 1) AND (ctime >= 3468470400) AND (ctime < 3468556800) AND NOT(((user_agent LIKE 'Mozilla%') OR (user_agent LIKE 'Opera%')))) GROUP BY (p_id,ip_address)) as foo GROUP BY foo.p_id)"))
   (is (= (insert-into :report-p-daily
                       '(:ctime :p-id :d :s :l2 :l1)
                       (select '(3468470400
@@ -135,7 +135,7 @@
                                                   [:= :report-p-daily-d.p-id :report-p-daily-l2.p-id])
                                                  (:report-p-daily-l1
                                                   [:= :report-p-daily-d.p-id :report-p-daily-l1.p-id]))))
-         "INSERT INTO report_p_daily (ctime,p_id,d,s,l2,l1) (SELECT (3468470400,report_p_daily_d.p_id,report_p_daily_d.d,report_p_daily_s.s,report_p_daily_l2.l2,report_p_daily_l1.l1) FROM report_p_daily_d FULL OUTER JOIN report_p_daily_s ON (report_p_daily_d.p_id = report_p_daily_s.p_id) FULL OUTER JOIN report_p_daily_l2 ON (report_p_daily_d.p_id = report_p_daily_l2.p_id) FULL OUTER JOIN report_p_daily_l1 ON (report_p_daily_d.p_id = report_p_daily_l1.p_id))"))
+         "INSERT INTO report_p_daily (ctime,p_id,d,s,l2,l1) (SELECT 3468470400,report_p_daily_d.p_id,report_p_daily_d.d,report_p_daily_s.s,report_p_daily_l2.l2,report_p_daily_l1.l1 FROM report_p_daily_d FULL OUTER JOIN report_p_daily_s ON (report_p_daily_d.p_id = report_p_daily_s.p_id) FULL OUTER JOIN report_p_daily_l2 ON (report_p_daily_d.p_id = report_p_daily_l2.p_id) FULL OUTER JOIN report_p_daily_l1 ON (report_p_daily_d.p_id = report_p_daily_l1.p_id))"))
   )
 
 ;; (run-tests 'cynojure.tests)
