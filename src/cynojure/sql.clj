@@ -190,20 +190,22 @@
              :where [:and [:>= :age 20] [:<= :age 40]])
    => \"select count(1) as cnt from person where ((age >= 20) and (age <= 40))\""
   (with-out-str
-    (print "SELECT" (if (list? what)
-                      (with-out-str (emit-list what :no-parens? true))
-                      (sql what))
-           "FROM" (cond
-                   (string? from) from
-                   (list? from) (with-out-str (emit-list from :no-parens? true))
-                   true (sql from)))
+    (print "SELECT" (cond
+                     (list? what) (with-out-str (emit-list what :no-parens? true))
+                     (= what :all) (sql :*)
+                     true (sql what)))
+    (when from
+      (print " FROM" (cond
+                     (string? from) from
+                     (list? from) (with-out-str (emit-list from :no-parens? true))
+                     true (sql from))))
     (when where (print " WHERE" (if (string? where) where (sql where))))
     (when full-outer-join
       (doseq [[join-table on-clause] full-outer-join]
         (print " FULL OUTER JOIN" (sql-str join-table) "ON ")
         (emit on-clause)))
     (when group-by (print " GROUP BY" (sql group-by)))
-    (when order-by (print " ORDER BY" (sql-pairs* (apply vector (mklist order-by)))))
+    (when order-by (print " ORDER BY" (sql-pairs* (mklist order-by))))
     (when limit (print " LIMIT" limit))
     (when offset (print " OFFSET" offset))))
 
