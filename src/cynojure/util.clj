@@ -156,31 +156,37 @@ character. i.e., (str* :foo) => \"foo\""
      (Double/parseDouble s)
      (catch java.lang.NumberFormatException _ nil))))
 
-(defun parse-date [date-str :key format]
-  "Parse date-str using the optional format into a java.util.Date
-  object."
-  (let [parser (new java.text.SimpleDateFormat (or format "EEE, d MMM yyyy HH:mm:ss Z"))]
+(def *current-timezone* nil)
+(defun parse-date [date-str :key format timezone]
+  "Parse date-str using the optional format, and timezone into a
+java.util.Date object."
+  (let [parser (new java.text.SimpleDateFormat
+                    (or format "EEE, d MMM yyyy HH:mm:ss Z"))
+        timezone (or timezone *current-timezone*)]
+    (if timezone (.setTimeZone parser timezone))
     (.parse parser date-str)))
 
 ;; (parse-date "Tue, 09 Jun 2009 22:11:40 GMT")
 
-(defun parse-sql-date [date-str :key format]
-  "Parse date-str using the optional format into a java.sql.Date
-  object."
-  (let [date (parse-date date-str :format format)]
+(defun parse-sql-date [date-str & parse-date-args]
+  "Parse date-str into a java.sql.Date object using the parse-date
+function. The `parse-date-args' are additional args to pass to the
+parse-date function."
+  (let [date (apply parse-date date-str parse-date-args)]
     (new java.sql.Date (.getTime date))))
 
 ;; (parse-sql-date "Tue, 09 Jun 2009 22:11:40 GMT")
 
-(defun parse-sql-timestamp [date-str :key format]
-  "Parse date-str using the optional format into a java.sql.Timestamp
-  object."
-  (let [date (parse-date date-str :format format)]
+(defun parse-sql-timestamp [date-str & parse-date-args]
+  "Parse date-str into a java.sql.Timestamp object using the
+parse-date function. The `parse-date-args' are additional args to pass
+to the parse-date function."
+  (let [date (apply parse-date date-str parse-date-args)]
     (new java.sql.Timestamp (.getTime date))))
 
 ;;  (parse-sql-timestamp "Tue, 09 Jun 2009 22:11:09 GMT")
 
-(defun format-date [date :key format]
+(defun format-date [date :key format ]
   (let [date (case (class date)
                    java.util.Date date
                    java.sql.Date (new java.util.Date (.getTime date))
