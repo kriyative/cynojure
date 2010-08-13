@@ -78,10 +78,11 @@
 
 (defn emit-function [[op & args]]
   (print (str (string-upcase (name op)) "("))
-  (emit (first args))
-  (doseq [arg (rest args)]
-    (print ",")
-    (emit arg))
+  (when args
+    (emit (first args))
+    (doseq [arg (rest args)]
+      (print ",")
+      (emit arg)))
   (print ")"))
 
 (defmacro defsqlfun [name]
