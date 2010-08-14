@@ -186,13 +186,15 @@ to the parse-date function."
 
 ;;  (parse-sql-timestamp "Tue, 09 Jun 2009 22:11:09 GMT")
 
-(defun format-date [date :key format ]
+(defun format-date [date :key format timezone]
   (let [date (case (class date)
-                   java.util.Date date
-                   java.sql.Date (new java.util.Date (.getTime date))
-                   java.sql.Timestamp (new java.util.Date (.getTime date)))
+               java.util.Date date
+               java.sql.Date (new java.util.Date (.getTime date))
+               java.sql.Timestamp (new java.util.Date (.getTime date)))
         formatter (new java.text.SimpleDateFormat (or format
-                                                      "EEE, d MMM yyyy HH:mm:ss Z"))]
+                                                      "EEE, d MMM yyyy HH:mm:ss Z"))
+        timezone (or timezone *current-timezone*)]
+    (if timezone (.setTimeZone formatter timezone))
     (.format formatter date)))
 
 ;; (format-date (new java.util.Date))
