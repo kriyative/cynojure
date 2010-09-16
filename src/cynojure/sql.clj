@@ -183,7 +183,8 @@
 (defmacro with-transaction [& body]
   `(perform-with-transaction (fn [] ~@body)))
 
-(defun query-str [what :key from where order-by group-by limit offset full-outer-join]
+(defun query-str [what :key from where order-by group-by limit offset
+                  full-outer-join left-outer-join]
   "Return a SQL SELECT query string, for the specified args.
 
   (query-str [:as [:count 1] :cnt]
@@ -204,6 +205,10 @@
     (when full-outer-join
       (doseq [[join-table on-clause] full-outer-join]
         (print " FULL OUTER JOIN" (sql-str join-table) "ON ")
+        (emit on-clause)))
+    (when left-outer-join
+      (doseq [[join-table on-clause] left-outer-join]
+        (print " LEFT OUTER JOIN" (sql-str join-table) "ON ")
         (emit on-clause)))
     (when group-by (print " GROUP BY" (sql group-by)))
     (when order-by (print " ORDER BY" (sql-pairs* (mklist order-by))))

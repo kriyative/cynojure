@@ -1,4 +1,4 @@
-(defproject org.clojars.kriyative/cynojure "1.0.3"
+(defproject org.clojars.kriyative/cynojure "1.0.4"
   :description "Cynojure - clojure library"
   :url "http://github.com/kriyative/cynojure"
   :dependencies [[org.clojure/clojure "1.1.0"]
