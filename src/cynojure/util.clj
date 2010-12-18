@@ -11,8 +11,9 @@
 ;; remove this notice, or any other, from this software.
 
 (ns cynojure.util
-  (:use clojure.contrib.seq-utils clojure.contrib.duck-streams
-        clojure.contrib.java-utils clojure.contrib.fcase)
+  (:use clojure.contrib.java-utils)
+  (:use [clojure.contrib.duck-streams :only [reader]])
+  (:use [clojure.contrib.seq-utils :only [includes?]])
   (:import (java.security MessageDigest)
 	   (java.io ByteArrayInputStream))
   (:use cynojure.cl))
@@ -80,14 +81,14 @@ character. i.e., (str* :foo) => \"foo\""
 ;; (ip-to-dotted (dotted-to-ip "127.0.0.1"))
 
 (defun md5-sum [message]
-  "Generate a MD5 checksum of the specified message."
+  "Generate a MD5 hash of the specified message."
   (let [digest (MessageDigest/getInstance "MD5")]
     (.update digest (.getBytes message))
     (let [bigint-str (.toString (new BigInteger 1 (.digest digest)) 16)
           leading-zeros (apply str (replicate (- 32 (count bigint-str)) \0))]
       (str leading-zeros bigint-str))))
 
-;; (md5-sum "foobar")
+;; (md5-sum "foobar")"3858f62230ac3c915f300c664312c63f"
 
 (defun get-classpaths []
   "Return the list of classpath entries."

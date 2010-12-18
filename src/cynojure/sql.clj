@@ -13,7 +13,7 @@
 (ns cynojure.sql
   (:use clojure.contrib.str-utils clojure.contrib.java-utils
         clojure.contrib.sql clojure.contrib.sql.internal
-        clojure.contrib.except clojure.contrib.fcase)
+        clojure.contrib.except)
   (:use cynojure.util cynojure.cl)
   (:import (java.sql BatchUpdateException DriverManager SQLException Statement)))
 

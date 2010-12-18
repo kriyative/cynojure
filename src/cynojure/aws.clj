@@ -34,7 +34,7 @@
 	   (com.xerox.amazonws.sqs2 SQSUtils)
 	   (com.xerox.amazonws.sqs2 MessageQueue)
 	   (com.xerox.amazonws.sqs2 Message))
-  (:use clojure.contrib.duck-streams)
+  (:use [clojure.contrib.duck-streams :only [file-str]])
   (:use cynojure.cl cynojure.util clojure.contrib.java-utils))
 
 (def *default-aws-authfile* (user-homedir-path ".awskeys.clj"))
@@ -84,7 +84,7 @@ load-aws-auth function."
   (.getBucket s name))
 
 (defun s3-list-objects [bucket path :key [s *s3*]]
-  (.listObjects s bucket path "/" 1024))
+  (.listObjects s bucket path "/" (long 1024)))
 
 (defun s3-put-file [bucket path source :key content-type acl [s *s3*]]
   "Put a file in the specified `bucket' and `path' on S3. The arg
@@ -99,6 +99,10 @@ load-aws-auth function."
     (.setMd5Hash obj (ServiceUtils/computeMD5Hash (new FileInputStream f)))
     (when acl (.addMetadata obj "x-amz-acl" acl))
     (.putObject s bucket obj)))
+
+(defun s3-delete-object [bucket object-key :key [s *s3*]]
+  "Delete a specified object identified by `object-key' in `bucket'."
+  (.deleteObject s bucket object-key))
 
 (defmacro with-s3 [s & body]
   "Create a S3 service binding, and invoke `body'."
@@ -146,7 +150,7 @@ load-aws-auth function."
 (defun sqs-receive-messages [count :key [queue *sqs-queue*]]
   "Retrieve multiple messages from `queue'. The arg `count' specifies
   how many messages to retrieve."
-  (.receiveMessages queue count))
+  (.receiveMessages queue (int count)))
 
 (defun sqs-delete-message [m :key [queue *sqs-queue*]]
   "Delete the specified message `m' from `queue'."
