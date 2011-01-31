@@ -210,17 +210,12 @@
       (doseq [[join-table on-clause] left-outer-join]
         (print " LEFT OUTER JOIN" (sql-str join-table) "ON ")
         (emit on-clause)))
-    (when group-by (print " GROUP BY" (sql group-by)))
+    (when group-by
+      (print " GROUP BY"
+             (with-out-str (emit-list (mklist group-by) :no-parens? true))))
     (when order-by (print " ORDER BY" (sql-pairs* (mklist order-by))))
     (when limit (print " LIMIT" limit))
     (when offset (print " OFFSET" offset))))
-
-(defun count-rows [:key from where]
-  "Perform SELECT COUNT(1) using the specified FROM and WHERE
-  clauses."
-  (with-query-results rs
-      [(query-str [:as [:count 1] :count] :from from :where where)]
-    (:count (first rs))))
 
 (defun update-str [table value-map :key where]
   "Return a SQL UPDATE command string using the specified args.
@@ -325,6 +320,13 @@ seq of the auto generated pkeys in this insert."
   parameters."
   [results sql-params & body]
   `(perform-with-resultset ~sql-params (fn [~results] ~@body)))
+
+(defun count-rows [:key from where]
+  "Perform SELECT COUNT(1) using the specified FROM and WHERE
+  clauses."
+  (with-resultset rs
+    (query-str [:count 1] :from from :where where)
+    (:count (first (doall rs)))))
 
 (defun create-table* [table-name cols & postscript]
   (str-join " "
