@@ -119,7 +119,7 @@
                                                 :group-by '(:p-id :ip-address))
                                         :foo)
                               :group-by :foo.p-id))
-         "INSERT INTO report_p_daily_s (p_id,s) (SELECT foo.p_id,COUNT(1) FROM (SELECT p_id,ip_address FROM audit_log_entry WHERE ((o_id = 1) AND (ctime >= 3468470400) AND (ctime < 3468556800) AND NOT(((user_agent LIKE 'Mozilla%') OR (user_agent LIKE 'Opera%')))) GROUP BY (p_id,ip_address)) as foo GROUP BY foo.p_id)"))
+         "INSERT INTO report_p_daily_s (p_id,s) (SELECT foo.p_id,COUNT(1) FROM (SELECT p_id,ip_address FROM audit_log_entry WHERE ((o_id = 1) AND (ctime >= 3468470400) AND (ctime < 3468556800) AND NOT(((user_agent LIKE 'Mozilla%') OR (user_agent LIKE 'Opera%')))) GROUP BY p_id,ip_address) as foo GROUP BY foo.p_id)"))
   (is (= (insert-into :report-p-daily
                       '(:ctime :p-id :d :s :l2 :l1)
                       (select '(3468470400
