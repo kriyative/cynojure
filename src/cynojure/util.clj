@@ -187,13 +187,16 @@ to the parse-date function."
 
 ;;  (parse-sql-timestamp "Tue, 09 Jun 2009 22:11:09 GMT")
 
+(defmulti to-date class)
+
+(defmethod to-date java.util.Date [d] d)
+(defmethod to-date java.sql.Date [d] (new java.util.Date (.getTime d)))
+(defmethod to-date java.sql.Timestamp [d] (new java.util.Date (.getTime d)))
+
 (defun format-date [date :key format timezone]
-  (let [date (case (class date)
-               java.util.Date date
-               java.sql.Date (new java.util.Date (.getTime date))
-               java.sql.Timestamp (new java.util.Date (.getTime date)))
-        formatter (new java.text.SimpleDateFormat (or format
-                                                      "EEE, d MMM yyyy HH:mm:ss Z"))
+  (let [date (to-date date)
+        formatter (new java.text.SimpleDateFormat
+                       (or format "EEE, d MMM yyyy HH:mm:ss Z"))
         timezone (or timezone *current-timezone*)]
     (if timezone (.setTimeZone formatter timezone))
     (.format formatter date)))
@@ -201,7 +204,9 @@ to the parse-date function."
 ;; (format-date (new java.util.Date))
 ;; (format-date (new java.sql.Date) :format )
 
-(defun format-iso8601-date [date] (format-date date :format "yyyy-MM-dd'T'HH:mm:ssZ"))
+(defn format-iso8601-date [date] (format-date date :format "yyyy-MM-dd'T'HH:mm:ssZ"))
+
+(defn now [] (new java.util.Date))
 
 (def url-re
      #"([a-z]+)://([-a-zA-Z0-9_.]+)(:[0-9]+)*[/]*([^#]*)(#\w+)*(\?.*)*")
@@ -275,7 +280,10 @@ to the parse-date function."
 
 (defn logger [level fmt & args]
   (when (get @*log-level* level)
-    (apply printf fmt args)
+    (apply printf (str "%s [%6s] " fmt)
+           (format-date (new java.util.Date) :format "yyyy-MM-dd HH:mm:ss")
+           (name level)
+           args)
     (flush)))
 
 (defn log-enable [level]
