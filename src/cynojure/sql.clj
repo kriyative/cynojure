@@ -365,6 +365,7 @@ seq of the auto generated pkeys in this insert."
             (concat ["INSERT INTO"
                      (sql-str table-name)
                      (with-out-str (emit-list cols))
+                     "VALUES"
                      (cond
                       (coll? (first what)) (str-join ", " (map #(sql %) what))
                       (coll? what) (sql what)
