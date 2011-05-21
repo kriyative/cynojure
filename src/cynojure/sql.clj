@@ -134,8 +134,7 @@
 
 (defmethod emit :default [expr]
   (cond
-    (vector? expr) (emit-list expr)
-    (list? expr) (emit-list expr)
+    (coll? expr) (emit-list expr)
     (= expr :all) (print "*")
     :else (print (sql-str expr))))
 
@@ -358,12 +357,19 @@ seq of the auto generated pkeys in this insert."
     (apply query-str query-args)
     (first rs)))
 
-(defun insert-into [table-name cols what]
+(defun insert-into [table-name cols what :key returning]
+  "Insert one or more rows of specified `cols`, into specified
+`table-name`, with optional return value specifed in `returning`."
+  ;; extended with suggestions from frazerty@posterous
   (str-join " "
-            ["INSERT INTO"
-             (sql-str table-name)
-             (with-out-str (emit-list cols))
-             (str "(" what ")")]))
+            (concat ["INSERT INTO"
+                     (sql-str table-name)
+                     (with-out-str (emit-list cols))
+                     (cond
+                      (coll? (first what)) (str-join ", " (map #(sql %) what))
+                      (coll? what) (sql what)
+                      true (str "(" what ")"))]
+                    (if returning [(str-join " " ["RETURNING" (sql returning)])]))))
 
 (defun create-index [name table cols]
   (str-join " "

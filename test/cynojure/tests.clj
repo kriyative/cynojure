@@ -136,6 +136,13 @@
                                                  (:report-p-daily-l1
                                                   [:= :report-p-daily-d.p-id :report-p-daily-l1.p-id]))))
          "INSERT INTO report_p_daily (ctime,p_id,d,s,l2,l1) (SELECT 3468470400,report_p_daily_d.p_id,report_p_daily_d.d,report_p_daily_s.s,report_p_daily_l2.l2,report_p_daily_l1.l1 FROM report_p_daily_d FULL OUTER JOIN report_p_daily_s ON (report_p_daily_d.p_id = report_p_daily_s.p_id) FULL OUTER JOIN report_p_daily_l2 ON (report_p_daily_d.p_id = report_p_daily_l2.p_id) FULL OUTER JOIN report_p_daily_l1 ON (report_p_daily_d.p_id = report_p_daily_l1.p_id))"))
+
+  (is (= (insert-into :actor
+                      '(:firstname :surname :password)
+                      [["firstname" "surname" "password"]
+                       ["firstname" "surname" "password"]]
+                      :returning [:a :b])
+         "INSERT INTO actor (firstname,surname,password) ('firstname','surname','password'), ('firstname','surname','password') RETURNING (a,b)"))
   )
 
 ;; (run-tests 'cynojure.tests)
