@@ -280,7 +280,7 @@ to the parse-date function."
 
 (defn logger [level fmt & args]
   (when (get @*log-level* level)
-    (apply printf (str "%s [%6s] " fmt)
+    (apply printf (str "%s [%6s] " fmt (if (.endsWith fmt "\n") "" "\n"))
            (format-date (new java.util.Date) :format "yyyy-MM-dd HH:mm:ss")
            (name level)
            args)
