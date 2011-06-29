@@ -60,5 +60,5 @@
 may be thrown, and return nil."
   `(try
     (do ~@body)
-    (catch Exception ex#
+    (catch Throwable ex#
       nil)))
