@@ -134,9 +134,11 @@
 
 (defmethod emit :default [expr]
   (cond
-    (coll? expr) (emit-list expr)
-    (= expr :all) (print "*")
-    :else (print (sql-str expr))))
+   (coll? expr) (emit-list expr)
+   (true? expr) (print "'t'")
+   (false? expr) (print "'f'")
+   (= expr :all) (print "*")
+   :else (print (sql-str expr))))
 
 (defun sql [expr]
   (with-out-str (emit expr)))
@@ -224,8 +226,9 @@
   (with-out-str
     (print "UPDATE" (sqly table)
            "SET"
-           (str-join "," (map (fn [x] (str (sqly (name x)) "=?")) (keys value-map)))
-           "WHERE" (if (string? where) where (sql where)))))
+           (str-join "," (map (fn [x] (str (sqly (name x)) "=?")) (keys value-map))))
+    (when where
+      (print " WHERE" (if (string? where) where (sql where))))))
 
 (defun update [table value-map :key where]
   "Perform a SQL UPDATE command using the specified args."
@@ -341,6 +344,13 @@ seq of the auto generated pkeys in this insert."
 
 (defun drop-table* [table-name]
   (str-join " " ["DROP TABLE IF EXISTS" (sql-str table-name)]))
+
+(defun alter-table* [table-name cols & postscript]
+  (str-join " "
+            ["ALTER TABLE"
+             (sql-str table-name)
+             (str-join "," (map (fn [s] (str-join " " (map sql s))) cols))
+             (if postscript (str "," (str-join "," postscript)) "")]))
 
 (defun create-temp-table [table-name cols :key on-commit]
   (str-join " "
